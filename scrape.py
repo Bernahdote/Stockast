@@ -226,6 +226,7 @@ def get_longer_news(ticker) -> str:
 
 
 if __name__ == "__main__": 
+    
     keys = get_keys("NVDA") 
     news = get_news("NVDA")
 

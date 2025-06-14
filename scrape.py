@@ -2,62 +2,59 @@ import os, json
 from dotenv import load_dotenv
 from aci import ACI
 from mistralai import Mistral
+from rich import print as rprint
+from rich.panel import Panel
 
 load_dotenv()
-aci = ACI(api_key=os.getenv("ACI_API_KEY"))
 OWNER_ID = "lamas"
+MISTRAL_API_KEY="WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde"
 
 key = os.getenv("ACI_API_KEY")
-print("▶️ Using ACI_API_KEY:", repr(key))
 
-START_FN = "SCRAPYBARA__START_INSTANCE"
-BASH_FN  = "SCRAPYBARA__RUN_BASH_ACTIONS"
-STOP_FN  = "SCRAPYBARA__STOP_INSTANCE"
+mistral = Mistral(MISTRAL_API_KEY)
+aci = ACI(api_key=os.getenv("ACI_API_KEY"))
 
-# 1) Start a new VM and print the raw response
-start_resp = aci.handle_function_call(
-    START_FN,
-    {"body": {"instance_type": "ubuntu", "timeout_hours": 1}},
-    linked_account_owner_id=OWNER_ID
-)
-print("▶️ Raw start response:", json.dumps(start_resp, indent=2))
+def main() -> None: 
 
-# 2) Extract the instance ID (either snake_case or camelCase)
-instance_id = start_resp.get("instance_id") 
-if not instance_id:
-    raise KeyError(f"Could not find instance_id in start_resp: {start_resp!r}")
-print(f"✅ Using instance ID = {instance_id}")
+    functions = aci.functions.get_definition(
+        "BRAVE_SEARCH__WEB_SEARCH"
+    )
+    
+    rprint(Panel("Brave search function definition", style="bold blue"))
+    rprint(functions)
 
-# 3) Run the scrape via BASH_FN
-bash_script = r"""
-pip install --quiet requests beautifulsoup4
-python3 - << 'EOF'
-import requests
-from bs4 import BeautifulSoup
+    response = mistral.chat.complete(
+        model="mistral-large-2411",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant with access to a variety of tools.",
+            },
+            {
+                "role": "user",
+                "content": "What is the Google link?",
+            },
+        ],
+        tools=[functions],
+        tool_choice="required",  # force the model to generate a tool call for demo purposes
+    )
 
-url  = "https://finance.yahoo.com/quote/AAPL"
-resp = requests.get(url, headers={"User-Agent":"aci-bot"})
-soup = BeautifulSoup(resp.text, "html.parser")
-price = soup.find("fin-streamer", {"data-field":"regularMarketPrice"}).text
-print(price)
-EOF
-"""
-bash_resp = aci.handle_function_call(
-    BASH_FN,
-    {"body": {
-        # match the key you saw above; if instanceId, use that
-        ("instanceId" if "instanceId" in start_resp else "instance_id"): instance_id,
-        "commands": [bash_script]
-    }}
-)
-print("🖥️  Raw bash response:", json.dumps(bash_resp, indent=2))
-print("Scraped price:", bash_resp.get("output", "").strip())
+    tool_call = (
+        response.choices[0].message.tool_calls[0]
+        if response.choices[0].message.tool_calls
+        else None
+    )
 
-# 4) Tear down the VM
-stop_resp = aci.handle_function_call(
-    STOP_FN,
-    {"body": {
-        ("instanceId" if "instanceId" in start_resp else "instance_id"): instance_id
-    }}
-)
-print(f"⏹️ Stopped instance: {instance_id}")
+    if tool_call:
+        rprint(Panel(f"Tool call: {tool_call.function.name}", style="bold green"))
+        rprint(f"arguments: {tool_call.function.arguments}")
+
+        result = aci.functions.execute(
+            tool_call.function.name,
+            json.loads(tool_call.function.arguments),
+            linked_account_owner_id=OWNER_ID,
+        )
+        rprint(Panel("Function Call Result", style="bold yellow"))
+        rprint(result)
+
+main()

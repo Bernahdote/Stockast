@@ -9,6 +9,7 @@ from rich.panel import Panel
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
+import ast 
 
 load_dotenv()                                 
 
@@ -30,17 +31,16 @@ def get_keys(ticker: str) -> str:
         },
         "lamas"  # Firecrawl account name in ACI
     )
+    
 
     markdown = scrape_result.data["data"]["markdown"]  # ← actual page text
-
-    # 2. Let Mistral extract price, market-cap, and P/E
     extract_resp = mistral.chat.complete(
         model="mistral-large-2411",
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "You are given Yahoo Finance page content in Markdown. "
+                    "You are given Yahoo Finance page content in Markdown of a specific ticker. "
                     "Key numbers of interest of the stock is"
                     "price, bid, ask, change today in percent of price"
                     "Write a free flow text summary of these key numbers."
@@ -53,6 +53,43 @@ def get_keys(ticker: str) -> str:
 
     return extract_resp.choices[0].message.content 
 
+def get_key_note(ticker: str) -> str:
+    try:
+        news_scrape = aci.functions.execute(
+            "FIRECRAWL__SCRAPE",
+            {
+                "body": {
+                    "url": f"https://finance.yahoo.com/quote/{ticker}/news",
+                    "formats": ["markdown"],
+                    "onlyMainContent": True,
+                    "blockAds": True,
+                }
+            },
+            "lamas",
+        )
+
+        news_md = news_scrape.data["data"]["markdown"]
+
+        news_resp = mistral.chat.complete(
+            model="mistral-large-2411",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are given the Yahoo Finance news page of the stock '{ticker}' in Markdown format.\n"
+                        "Your task is to extract and summarize the key takeaways from the most recent articles.\n"
+                        "Return 5–7 concise bullet points summarizing the major updates or themes regarding this stock.\n"
+                        "Use plain English, keep each bullet point brief (max 2 lines). No intro or conclusion, only the bullet points."
+                    ),
+                },
+                {"role": "user", "content": news_md},
+            ],
+        )
+
+        return news_resp.choices[0].message.content.strip()
+
+    except Exception as e:
+        return f"Failed to retrieve key notes for {ticker}: {e}"
 
 def get_news(ticker: str) -> str:
 
@@ -79,7 +116,7 @@ def get_news(ticker: str) -> str:
                 {
                     "role": "system",
                     "content": (
-                        "You receive the Yahoo Finance News page for a specific stock. "
+                        "You receive the Yahoo Finance News page for a specific ticker. "
                         "Write three paragraphs about the most stressing news about this stock in free text, not bullet points."
                     ),
                 },
@@ -89,7 +126,6 @@ def get_news(ticker: str) -> str:
 
 
         return news_resp.choices[0].message.content
-
 
 def get_longer_news(ticker: str) -> str:
 
@@ -219,7 +255,8 @@ def get_longer_news(ticker: str) -> str:
     return summaries
 
 def get_sector_news(sector: str) -> str:
-
+    
+    print(f"Fetching news for sector: {sector}")
 
     news_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
@@ -242,9 +279,8 @@ def get_sector_news(sector: str) -> str:
                 {
                     "role": "system",
                     "content": (
-                        "You receive the Yahoo Finance for a specifc sector. You will find news on the page."
-                        "Please write a brief summary on how the sector is performing recently. "
-                       "In addition to this, write three paragraphs about the most relevant news about this sector in free text, not bullet points."
+                        "You receive the markdown content from Yahoo Finance page for a specifc SECTOR."
+                        "Please write a brief summary on how the SECTOR is performing recently, fluent text no bullet points"
                     ),
                 },
                 {"role": "user", "content": news_md},
@@ -276,9 +312,8 @@ def get_market_news(market: str) -> str:
                 {
                     "role": "system",
                     "content": (
-                        "You receive the Yahoo Finance for a specifc market. You will find news on the page."
-                        "Please write a brief summary on how the sector is performing recently. "
-                       "In addition to this, write three paragraphs about the most relevant news about this market in free text, not bullet points."
+                        "You receive the markdown content from Yahoo Finance page for a specific MARKET."
+                        "Please scrape this page and write brief summary on the news in thiss specific MARKET recently in free text, not bullet points. "
                     ),
                 },
                 {"role": "user", "content": news_md},
@@ -287,7 +322,6 @@ def get_market_news(market: str) -> str:
 
 
     return news_resp.choices[0].message.content
-
 
 def understand_tickrs(text: str) -> list[str]: 
 
@@ -323,7 +357,7 @@ def understand_sectors(text: str) -> list[str]:
                 "content": (
                     "You are given a string, with stocks and sectors of interest"
                     "Return ONLY a array of the interesting sectors, according to categories below. Do not return ANYTHING else. "
-                    "Sectors are: ['technology', 'energy', 'healthcare', 'financial-services', 'consumer-cyclical', 'communication-services', 'consumer-defensive', 'industrials', 'utilities', 'real-estate', 'Basic Materials']"
+                    "Sectors are: ['technology', 'energy', 'healthcare', 'financial-services', 'consumer-cyclical', 'communication-services', 'consumer-defensive', 'industrials', 'utilities', 'real-estate', 'basic-materials']"
                     "As an example, if the user writes that they are interested in energy sector, you should return ['energy']."
                     "NOTE: This is not a ticker. It can also be empty, if there is not a apparent interest in a sector."
 
@@ -332,12 +366,8 @@ def understand_sectors(text: str) -> list[str]:
             {"role": "user", "content": text},
         ],
     )
-    raw = resp.choices[0].message.content          
-    tokens = [t.strip("[] ")                       
-              for t in raw.split(",")             
-              if t.strip(" []")]                  
-    return tokens
-
+    return resp.choices[0].message.content        
+   
 def understand_markets(text: str) -> list[str]: 
 
     resp = mistral.chat.complete(
@@ -357,11 +387,7 @@ def understand_markets(text: str) -> list[str]:
             {"role": "user", "content": text},
         ],
     )
-    raw = resp.choices[0].message.content          
-    tokens = [t.strip("[] ")                       
-              for t in raw.split(",")             
-              if t.strip(" []")]                  
-    return tokens
+    return resp.choices[0].message.content
 
 def generate_podcast(text: str) -> str:
     """
@@ -373,14 +399,17 @@ def generate_podcast(text: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are given a text that summarizes the latest news about specific stocks, markets and sectos. "
+                    "You are given a text that summarizes the latest news about specific stocks, markets and sectors. "
                     "Generate a podcast script based on this text, making it engaging and suitable for audio format. "
-                    "Start with a catchy introduction, then give the technical analysis of the stock, "
-                    "and finally deliver the news summary. "
+                    "Start with a catchy introduction"
+                    "Keep the information of the stock, sector and market similar in length, so that the podcast is balanced. "
                     "Use a friendly tone, speak directly to the listener, no bullet points—free text only. "
                     "Keep it concise but informative (≈5 minutes when read aloud). "
-                    "Avoid repeating information.", 
+                    "Avoid repeating information." 
                     "Only return the final podcast script."
+                    "No more delimiters like [Outro] or [Intro]. "
+                    "no Host:"
+                    "no [Closing music] or ### Final Podcast Script" 
                 ),
             },
             {"role": "user", "content": text},
@@ -461,7 +490,7 @@ def get_technical_summary(ticker: str) -> str:
 
 if __name__ == "__main__": 
 
-    input = "I'm interested in Google and materials and currencies"  
+    input = "I'm interested in Apple and health services and crypto"  
     keys = understand_tickrs(input) 
     sectors = understand_sectors(input) 
     markets = understand_markets(input)
@@ -470,19 +499,22 @@ if __name__ == "__main__":
     print(sectors)
     print(markets)
 
+    summary = "" 
 
-    sum = ""
-    for key in keys: 
-        keyfacts = get_keys(key) 
-        news = get_news(key)
-        sum = sum.join([keyfacts, news])
-    
-    for sec in sectors: 
-        sec_news = get_sector_news(sec)
-        sum = sum.join([sec_news])
+    for key in keys:
+        summary += get_keys(key) 
+        summary += get_technical_summary(key)
+        summary += get_news(key) 
+
+
+    sectors  = ast.literal_eval(sectors)   
+    markets  = ast.literal_eval(markets)  
+
+    for sec in sectors:
+        summary += get_sector_news(sec) 
 
     for market in markets:
-        market_news = get_market_news(market)
-        sum = sum.join([market_news])
+        summary += get_market_news(market)
 
-    print(sum)
+    print(generate_podcast(summary))
+

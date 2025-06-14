@@ -88,8 +88,7 @@ def get_news(ticker) -> str:
 
 
 def get_longer_news(ticker) -> str:
-    
-    
+
     try:
         main_news_page_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
@@ -224,12 +223,38 @@ def get_longer_news(ticker) -> str:
     return summaries
 
 
+def understand_input(text: str) -> list[str]: 
+
+    resp = mistral.chat.complete(
+        model="mistral-large-2411",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are given a string, with stocks that wants to be examined."
+                    "Return ONLY a array of the stock tickers (all CAPS, no duplicates, comma separated)"
+                    "As an example, if the user writes that they are interested in Google and Apple, you should return [AAPl, GOOGL]."
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    raw = resp.choices[0].message.content          
+    tokens = [t.strip("[] ")                       
+              for t in raw.split(",")             
+              if t.strip(" []")]                  
+    return tokens
+
 
 if __name__ == "__main__": 
-    
-    keys = get_keys("NVDA") 
-    news = get_news("NVDA")
 
-    sum = "".join([keys, news])
+    keys = understand_input("I'm interested in Google, Nividia and Apple stocks") 
+
+    print(keys) 
+    sum = ""
+    for key in keys: 
+        keyfacts = get_keys(key) 
+        news = get_news(key)
+        sum = sum.join([keyfacts, news])
 
     print(sum)

@@ -114,10 +114,16 @@ src/
 
 ### Backend (scrape.py) 
 
+
+
 * The functions understand_tickers(), understand_sectors() and understand_markets() all take a string as in input and analyzes which tickers, sectors and markets respectively that the user is interested in in an array []. 
-* The function get_keys() takes a string as a ticker and returns a string of brief key analytics of the stock. 
+* The function get_keys() takes a string ticker input and returns a string of brief key analytics of the stock.
+* The function get_key_note() takes a string ticker input at returns a bullet points list of key news on the stock.
 * The function get_news() takes a string as a ticker and returns a string of brief news about this stock. 
-* The function get_market_news() and get_sector_news() takes a string as market/sector (as given from understand_sectors() or understand_markets()) and returns a string that describes important news of this market/sector. 
+* The function get_market_news() and get_sector_news() takes a string as market/sector (as given from understand_sectors() or understand_markets()) and returns a string that describes important news of this market/sector.
+* The function get_technical_summer() takes a string ticker as in put and returns financial data with comparisons in time for this stock
+* The function generate_podcast() takes a string as input and rewrites it in a "podcast"- manner. It also tries to balance out imbalances between sections.
+  
 * See main method in scrape.py for example of usage with an example input. 
 
 

@@ -1,3 +1,11 @@
+
+# Stockast
+See README
+
+## Call TTS Test
+```
+pytest tts/test_tts.py
+```
 # AI Demo Project
 
 This project demonstrates the integration of various AI services including text-to-speech and chat functionality.

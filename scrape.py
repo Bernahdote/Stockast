@@ -12,102 +12,14 @@ load_dotenv()
 aci     = ACI(api_key=os.getenv("ACI_API_KEY"))
 mistral = Mistral("WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde")
 
-prompt = (
-    "You are a helpful assistant with access to a unlimited number of tools via a meta function: "
-    "ACI_SEARCH_FUNCTIONS"
-    "You can use ACI_SEARCH_FUNCTIONS to find relevant functions across all apps."
-    "Once you have identified the functions you need to use, you can append them to the tools list and use them in future tool calls."
-)
 
-tools_meta = [
-    ACISearchFunctions.to_json_schema(FunctionDefinitionFormat.OPENAI),
-]
+def get_keys(ticker) -> str:
 
-tools_retrieved: list[dict] = []
-
-
-def main() -> None:
-    # Start the LLM processing loop
-    chat_history: list[dict] = []
-
-    while True:
-        rprint(Panel("Waiting for LLM Output", style="bold blue"))
-        response = mistral.chat.complete(
-            model="mistral-large-latest",
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
-                {
-                    "role": "user",
-                    "content": "Navigate to https://finance.yahoo.com/quote/AAPL/. Scrape the data with FIRECRAWL__SEARCH. With the scraped data, extract ONLY: price, change in percen, bid and ask. Return a summary in free text of ONLY these keys"
-                },
-            ]
-            + chat_history,
-            tools=tools_meta + tools_retrieved,
-            # tool_choice="required",  # force the model to generate a tool call
-            parallel_tool_calls=False,
-        )
-
-        # Process LLM response and potential function call (there can only be at most one function call)
-        content = response.choices[0].message.content
-        tool_call = (
-            response.choices[0].message.tool_calls[0]
-            if response.choices[0].message.tool_calls
-            else None
-        )
-        if content:
-            rprint(Panel("LLM Message", style="bold green"))
-            rprint(content)
-            chat_history.append({"role": "assistant", "content": content})
-
-        # Handle function call if any
-        if tool_call:
-            rprint(
-                Panel(f"Function Call: {tool_call.function.name}", style="bold yellow")
-            )
-            rprint(f"arguments: {tool_call.function.arguments}")
-
-            chat_history.append({"role": "assistant", "tool_calls": [tool_call]})
-            result = aci.handle_function_call(
-                tool_call.function.name,
-                json.loads(tool_call.function.arguments),
-                linked_account_owner_id="lamas",
-                allowed_apps_only=True,
-                format=FunctionDefinitionFormat.OPENAI,
-            )
-            # if the function call is a get, add the retrieved function definition to the tools_retrieved
-            if tool_call.function.name == ACISearchFunctions.get_name():
-                tools_retrieved.extend(result)
-
-            rprint(Panel("Function Call Result", style="bold magenta"))
-            rprint(result)
-            # Continue loop, feeding the result back to the LLM for further instructions
-            chat_history.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": json.dumps(result),
-                }
-            )
-        else:
-            # If there's no further function call, exit the loop
-            rprint(Panel("Task Completed", style="bold green"))
-            break
-
-
-
-
-
-""" # 1. Scrape the Yahoo Finance page via Firecrawl (markdown output)
-
-def get_summarize(): 
     scrape_result = aci.functions.execute(
         "FIRECRAWL__SCRAPE",
         {
             "body": {
-                "url": "https://finance.yahoo.com/quote/AAPL",
+                "url": f"https://finance.yahoo.com/quote/{ticker}", 
                 "formats": ["markdown"],
                 "onlyMainContent": True,
                 "blockAds": True,
@@ -115,7 +27,6 @@ def get_summarize():
         },
         "lamas"  # Firecrawl account name in ACI
     )
-
 
     markdown = scrape_result.data["data"]["markdown"]  # ← actual page text
 
@@ -127,17 +38,223 @@ def get_summarize():
                 "role": "system",
                 "content": (
                     "You are given Yahoo Finance page content in Markdown. "
-                    "Return these fields as JSON: "
-                    "`price`, `marketCap`, and `peRatio`."
-                    "Also, provide the change in percent of the price"
+                    "Write a summary of the following key numbers: "
+                    "price, bid, ask, change today in percent of price"
+                    "Write a free flow text summary of these key numbers. Start directly, you do not need an introducing sentence."
                 ),
             },
             {"role": "user", "content": markdown},
         ],
     )
 
-    rprint(extract_resp.choices[0].message.content) """
+    return extract_resp.choices[0].message.content 
+
+
+def get_news(ticker) -> str:
+
+        news_scrape = aci.functions.execute(
+            "FIRECRAWL__SCRAPE",
+            {
+                "body": {
+                    "url": f"https://finance.yahoo.com/quote/{ticker}/news",
+                    "formats": ["markdown"],
+                    "onlyMainContent": True,
+                    "blockAds": True,
+                }
+            },
+            "lamas",
+        )
+
+        news_md = news_scrape.data["data"]["markdown"]
+
+
+
+        news_resp = mistral.chat.complete(
+            model="mistral-large-2411",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You receive the Yahoo Finance News page for a specific stock. "
+                        "Write three paragraphs about the most stressing news about this stock in free text, not bullet points."
+                    ),
+                },
+                {"role": "user", "content": news_md},
+            ],
+        )
+
+
+        return news_resp.choices[0].message.content
+
+
+def get_longer_news(ticker) -> str:
+
+    try:
+        main_news_page_scrape = aci.functions.execute(
+            "FIRECRAWL__SCRAPE",
+            {
+                "body": {
+                    "url": f"https://finance.yahoo.com/quote/{ticker}/news",
+                    "formats": ["markdown"], 
+                    "onlyMainContent": True, 
+                    "blockAds": True,
+                }
+            },
+            "lamas"
+        )
+        main_news_data = main_news_page_scrape.data
+        if not main_news_data or "data" not in main_news_data or "markdown" not in main_news_data["data"]:
+            rprint(Panel("Failed to retrieve valid data structure from main news page scrape.", style="bold red"))
+            error_details = main_news_data.get("error") if main_news_data else None
+            if not error_details and hasattr(main_news_page_scrape, 'error') and main_news_page_scrape.error:
+                 error_details = main_news_page_scrape.error
+            if error_details:
+                 rprint(f"Error details: {error_details}")
+            return
+        main_news_md = main_news_data["data"]["markdown"]
+        if not main_news_md: # Check if markdown content itself is empty
+            rprint(Panel("Markdown content is empty for main news page.", style="bold red"))
+            return
+            
+    except Exception as e:
+        rprint(Panel(f"Failed to scrape main news page: {e}", style="bold red"))
+        return
+
+    rprint(Panel("Extracting article links using Mistral", style="bold blue"))
+    article_links = []
+    try:
+        links_extraction_resp = mistral.chat.complete(
+            model="mistral-large-latest", 
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are given Markdown content from the Yahoo Finance news page for {ticker}. "
+                        "Extract all unique URLs that appear to be links to individual news articles. "
+                        "Many links on Yahoo Finance might be relative (e.g., /news/some-article-12345.html or /video/some-video-1234.html). "
+                        "Convert these to absolute URLs by prepending 'https://finance.yahoo.com'. "
+                        "Return a JSON object with a single key 'article_urls', where the value is a list of these absolute URLs. "
+                        "Example: {'article_urls': ["'https://finance.yahoo.com/news/article1.html'"]}. "
+                        "Focus on links that are clearly news articles or news-related videos. Ensure all URLs in the list are strings."
+                        "Use only the first 10 articles. "
+                    ),
+                },
+                {"role": "user", "content": main_news_md},
+            ],
+            response_format={"type": "json_object"} 
+        )
+        
+        extracted_content_str = links_extraction_resp.choices[0].message.content
+        extracted_data = json.loads(extracted_content_str)
+        article_links_raw = extracted_data.get("article_urls", [])
+
+        if not isinstance(article_links_raw, list):
+            rprint(Panel("Mistral did not return a list for 'article_urls'.", style="bold red"))
+            rprint(f"Mistral's response: {extracted_content_str}")
+            return
+        
+        # Ensure all links are strings and filter for absolute URLs
+        article_links = [str(link) for link in article_links_raw if isinstance(link, (str, bytes))] 
+        article_links = [link for link in article_links if link.startswith("http")] 
+
+            
+    except json.JSONDecodeError as e:
+        rprint(Panel(f"Failed to parse JSON from Mistral's link extraction response: {e}", style="bold red"))
+        if 'links_extraction_resp' in locals() and hasattr(links_extraction_resp, 'choices') and links_extraction_resp.choices:
+             rprint(f"Mistral's raw response: {links_extraction_resp.choices[0].message.content}")
+        return
+    except Exception as e:
+        rprint(Panel(f"Failed to extract links using Mistral: {e}", style="bold red"))
+        if 'links_extraction_resp' in locals() and hasattr(links_extraction_resp, 'choices') and links_extraction_resp.choices:
+             rprint(f"Mistral's raw response: {links_extraction_resp.choices[0].message.content}")
+        return
+    summaries = ""
+    for i, link_url in enumerate(article_links):
+
+        try:
+            article_scrape_result = aci.functions.execute(
+                "FIRECRAWL__SCRAPE",
+                {
+                    "body": {
+                        "url": link_url,
+                        "formats": ["markdown"],
+                        "onlyMainContent": True,
+                        "blockAds": True,
+                    }
+                },
+                "lamas"
+            )
+            article_data = article_scrape_result.data
+            if not article_data or "data" not in article_data or "markdown" not in article_data["data"]:
+                rprint(Panel(f"No valid data structure for {link_url}. Skipping.", style="bold yellow"))
+                error_details = article_data.get("error") if article_data else None
+                if not error_details and hasattr(article_scrape_result, 'error') and article_scrape_result.error:
+                    error_details = article_scrape_result.error
+                if error_details:
+                    rprint(f"Scraping error details: {error_details}")
+                continue
+            article_md = article_data["data"]["markdown"]
+
+            if not article_md:
+                rprint(Panel(f"No markdown content found for {link_url}. Skipping.", style="bold yellow"))
+                continue
+
+            summary_resp = mistral.chat.complete(
+                model="mistral-large-latest",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are given the Markdown content of a news article. "
+                            "Provide a concise summary of this article in free text. Focus on the key information and main points."
+                        ),
+                    },
+                    {"role": "user", "content": article_md},
+                ],
+            )
+            summary_content = summary_resp.choices[0].message.content
+            summaries = summaries + summary_content
+    
+            rprint(summary_content)
+
+        except Exception as e:
+            rprint(Panel(f"Failed to process article {link_url}: {e}", style="bold red"))
+        
+    return summaries
+
+
+def understand_input(text: str) -> list[str]: 
+
+    resp = mistral.chat.complete(
+        model="mistral-large-2411",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are given a string, with stocks that wants to be examined."
+                    "Return ONLY a array of the stock tickers (all CAPS, no duplicates, comma separated)"
+                    "As an example, if the user writes that they are interested in Google and Apple, you should return [AAPl, GOOGL]."
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    raw = resp.choices[0].message.content          
+    tokens = [t.strip("[] ")                       
+              for t in raw.split(",")             
+              if t.strip(" []")]                  
+    return tokens
 
 
 if __name__ == "__main__": 
-    main()
+
+    keys = understand_input("I'm interested in Google, Nividia and Apple stocks") 
+
+    print(keys) 
+    sum = ""
+    for key in keys: 
+        keyfacts = get_keys(key) 
+        news = get_news(key)
+        sum = sum.join([keyfacts, news])
+
+    print(sum)

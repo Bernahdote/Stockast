@@ -1,6 +1,7 @@
 
 # Stockast
-See README
+AI-application MVP project at Hackathon in Karlsruhe (KIT) hosted by {Tech: Europe}, supported by ACI.dev, ElevenLabs and Mistral. 
+
 
 ## Call TTS Test
 ```

@@ -10,20 +10,19 @@ app = FastAPI()
 load_dotenv()
 
 eleven_api = os.getenv("ELEVENLABS_API_KEY")
-voice_id = os.getenv("VOICE_ID")
 
 class TTSRequest(BaseModel):
     text: str
+    voice_id: str
 
-@app.post("/speak-download")
-def speak_and_download(req: TTSRequest):
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+def speak_and_download(args: TTSRequest):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{args.voice_id}"
     headers = {
         "xi-api-key": eleven_api,
         "Content-Type": "application/json"
     }
     payload = {
-        "text": req.text,
+        "text": args.text,
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.75

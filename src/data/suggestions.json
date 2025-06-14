@@ -1,0 +1,102 @@
+{
+  "market_trends": {
+    "category": "시장 동향",
+    "questions": [
+      "What's the current market trend?",
+      "How is the market performing today?",
+      "What's the market sentiment right now?",
+      "Is this a good time to invest?",
+      "What's the market volatility like today?"
+    ]
+  },
+  "sector_analysis": {
+    "category": "섹터별 분석",
+    "questions": [
+      "Which sectors are performing well?",
+      "What's the outlook for tech stocks?",
+      "How are financial stocks doing?",
+      "What's happening in the energy sector?",
+      "Which sectors are underperforming?"
+    ]
+  },
+  "individual_stocks": {
+    "category": "개별 주식",
+    "questions": [
+      "What are the top gainers today?",
+      "What are the top losers today?",
+      "Which stocks have high trading volume?",
+      "What stocks are hitting new highs?",
+      "What stocks are hitting new lows?"
+    ]
+  },
+  "investment_strategy": {
+    "category": "투자 전략",
+    "questions": [
+      "What's your investment advice?",
+      "Should I buy the dip?",
+      "What's a good defensive stock?",
+      "Which stocks are good for long-term investment?",
+      "What are some high-dividend stocks?"
+    ]
+  },
+  "market_analysis": {
+    "category": "시장 분석",
+    "questions": [
+      "Give me a market analysis",
+      "What's the market breadth like?",
+      "How are the market indicators looking?",
+      "What's the market momentum?",
+      "What's the market support level?"
+    ]
+  },
+  "news_events": {
+    "category": "뉴스 및 이벤트",
+    "questions": [
+      "What's the latest market news?",
+      "What economic events are coming up?",
+      "How will the Fed's decision affect the market?",
+      "What's the impact of inflation on stocks?",
+      "How are interest rates affecting the market?"
+    ]
+  },
+  "technical_analysis": {
+    "category": "기술적 분석",
+    "questions": [
+      "What's the market's technical analysis?",
+      "What's the RSI indicator showing?",
+      "What's the MACD indicating?",
+      "What's the market's moving average?",
+      "What's the market's support and resistance?"
+    ]
+  },
+  "global_markets": {
+    "category": "글로벌 시장",
+    "questions": [
+      "How are global markets performing?",
+      "What's happening in Asian markets?",
+      "How are European markets doing?",
+      "What's the impact of foreign markets?",
+      "How is the dollar affecting the market?"
+    ]
+  },
+  "industry_analysis": {
+    "category": "산업별 분석",
+    "questions": [
+      "What's the outlook for AI stocks?",
+      "How are semiconductor stocks performing?",
+      "What's happening in the EV market?",
+      "How are renewable energy stocks doing?",
+      "What's the trend in healthcare stocks?"
+    ]
+  },
+  "investment_advice": {
+    "category": "투자 조언",
+    "questions": [
+      "What stocks should I watch?",
+      "What's a good entry point?",
+      "Should I take profits now?",
+      "What's your risk assessment?",
+      "What's a good portfolio balance?"
+    ]
+  }
+} 

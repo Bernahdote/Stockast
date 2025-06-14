@@ -461,7 +461,6 @@ def get_technical_summary(ticker: str) -> str:
 
 if __name__ == "__main__": 
 
-
     input = "I'm interested in Google and materials and currencies"  
     keys = understand_tickrs(input) 
     sectors = understand_sectors(input) 

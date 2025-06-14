@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, TrendingUp, MessageSquare, Mic, BarChart3 } from 'lucide-react';
+import { ChevronUp, TrendingUp, MessageSquare, Mic, BarChart3 } from 'lucide-react';
 
 // Mock stock data for carousel display (icons, tickers, prices, change rates)
 const MOCK_TOP = [
@@ -126,7 +126,7 @@ export default function Home() {
 
             {/* Updated Search Input with Mode Buttons Inside */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <div className="w-full max-w-3xl bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
+              <div className="w-full bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
                 <input
                   type="text"
                   value={demoInput}
@@ -136,8 +136,7 @@ export default function Home() {
                   style={{ letterSpacing: '0.01em' }}
                   disabled={mode !== 'text'}
                 />
-                {/* Mode Buttons Inside Search Container */}
-                <div className="flex gap-3 mt-4 justify-start">
+                <div className="flex items-center gap-3 mt-4">
                   {MODES.map((m) => (
                     <button
                       key={m.id}
@@ -148,11 +147,14 @@ export default function Home() {
                       {m.label}
                     </button>
                   ))}
+                  <button
+                    className="ml-auto px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all flex items-center justify-center"
+                    style={{ minWidth: 56, minHeight: 56 }}
+                  >
+                    <ChevronUp className="w-6 h-6" />
+                  </button>
                 </div>
               </div>
-              <button className="px-8 py-6 bg-blue-600 text-white font-semibold rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2 text-xl shadow-lg">
-                Generate <ChevronRight className="w-6 h-6" />
-              </button>
             </div>
 
             <div className="flex justify-center items-center gap-8 text-base text-gray-500">

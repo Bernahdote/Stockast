@@ -21,8 +21,7 @@ async def process_text(request: TextRequest):
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
     try:
-        
-        return speak_and_download(request)
+        return speak_and_download(request.text, request.voice_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

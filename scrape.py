@@ -13,12 +13,13 @@ aci     = ACI(api_key=os.getenv("ACI_API_KEY"))
 mistral = Mistral("WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde")
 
 
-def get_keys(): 
+def get_keys(ticker) -> str:
+
     scrape_result = aci.functions.execute(
         "FIRECRAWL__SCRAPE",
         {
             "body": {
-                "url": "https://finance.yahoo.com/quote/AAPL",
+                "url": f"https://finance.yahoo.com/quote/{ticker}", 
                 "formats": ["markdown"],
                 "onlyMainContent": True,
                 "blockAds": True,
@@ -39,22 +40,23 @@ def get_keys():
                     "You are given Yahoo Finance page content in Markdown. "
                     "Write a summary of the following key numbers: "
                     "price, bid, ask, change today in percent of price"
-                    "Write a free flow text summary of these key numbers."
+                    "Write a free flow text summary of these key numbers. Start directly, you do not need an introducing sentence."
                 ),
             },
             {"role": "user", "content": markdown},
         ],
     )
 
-    rprint(extract_resp.choices[0].message.content) 
+    return extract_resp.choices[0].message.content 
 
 
-def get_news():
+def get_news(ticker) -> str:
+
         news_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
-                    "url": "https://finance.yahoo.com/quote/AAPL/news",
+                    "url": f"https://finance.yahoo.com/quote/{ticker}/news",
                     "formats": ["markdown"],
                     "onlyMainContent": True,
                     "blockAds": True,
@@ -73,9 +75,8 @@ def get_news():
                 {
                     "role": "system",
                     "content": (
-                        "You receive Markdown for the AAPL news page. "
-                        "Return a JSON array called `articles`, each element having "
-                        "`headline`, `url`, and `published`. Write a short summary of the most stressing news in free text."
+                        "You receive the Yahoo Finance News page for a specific stock. "
+                        "Write three paragraphs about the most stressing news about this stock in free text, not bullet points."
                     ),
                 },
                 {"role": "user", "content": news_md},
@@ -83,11 +84,15 @@ def get_news():
         )
 
 
-        rprint(news_resp.choices[0].message.content)
+        return news_resp.choices[0].message.content
 
 
 
 
 if __name__ == "__main__": 
-    get_keys() 
-    get_news() 
+    keys = get_keys("VEON") 
+    news = get_news("VEON")
+
+    sum = "".join([keys, news])
+
+    print(sum)

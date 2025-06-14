@@ -92,13 +92,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Sticky Header with Get Started */}
-      <header className="w-full px-6 py-4 flex justify-between items-center max-w-[1200px] mx-auto sticky top-0 z-30 bg-gradient-to-br from-slate-50 to-blue-50 bg-opacity-90 backdrop-blur shadow-md transition-colors duration-300">
+      {/* Updated Header */}
+      <header className="w-full px-6 py-4 flex justify-between items-center max-w-[1200px] mx-auto sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm transition-all duration-300">
         <div className="text-2xl font-bold text-blue-600">Stockast</div>
         <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
           Get Started
         </button>
-        <div className="absolute left-0 top-full w-full h-4 bg-black/10 pointer-events-none" />
       </header>
 
       <div className="max-w-[1200px] mx-auto px-6">
@@ -125,34 +124,35 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Large search input */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
-              <input
-                type="text"
-                value={demoInput}
-                onChange={e => setDemoInput(e.target.value)}
-                placeholder="e.g. Tesla Q2 forecast, Best AI stocks 2024, Fed interest rate news"
-                className="w-full px-8 py-6 rounded-2xl border-2 border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 text-2xl font-bold text-blue-900 bg-white shadow-lg placeholder-blue-400 placeholder:font-bold placeholder:text-lg"
-                style={{ letterSpacing: '0.01em' }}
-                disabled={mode !== 'text'}
-              />
+            {/* Updated Search Input with Mode Buttons Inside */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <div className="w-full max-w-3xl bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
+                <input
+                  type="text"
+                  value={demoInput}
+                  onChange={e => setDemoInput(e.target.value)}
+                  placeholder="e.g. Tesla Q2 forecast, Best AI stocks 2024, Fed interest rate news"
+                  className="w-full px-4 py-4 rounded-xl border-none focus:ring-2 focus:ring-blue-500 text-xl font-bold text-blue-900 bg-transparent placeholder-blue-400 placeholder:font-bold placeholder:text-lg"
+                  style={{ letterSpacing: '0.01em' }}
+                  disabled={mode !== 'text'}
+                />
+                {/* Mode Buttons Inside Search Container */}
+                <div className="flex gap-3 mt-4 justify-start">
+                  {MODES.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setMode(m.id)}
+                      className={`px-4 py-1.5 rounded-full border font-semibold transition-colors text-sm
+                        ${mode === m.id ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button className="px-8 py-6 bg-blue-600 text-white font-semibold rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2 text-xl shadow-lg">
                 Generate <ChevronRight className="w-6 h-6" />
               </button>
-            </div>
-
-            {/* 모드 선택 버튼 그룹 */}
-            <div className="flex justify-center gap-3 mb-12">
-              {MODES.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setMode(m.id)}
-                  className={`px-6 py-2 rounded-full border font-semibold transition-colors text-lg shadow-sm
-                    ${mode === m.id ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'}`}
-                >
-                  {m.label}
-                </button>
-              ))}
             </div>
 
             <div className="flex justify-center items-center gap-8 text-base text-gray-500">

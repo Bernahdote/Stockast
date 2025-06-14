@@ -2,6 +2,10 @@
 # Stockast
 AI-application MVP project at Hackathon in Karlsruhe (KIT) hosted by {Tech: Europe}, supported by ACI.dev, ElevenLabs and Mistral. 
 
+### Our Goals
+We set out to build a platform that helps you stay on top of your investment portfolio. Using real-time news and statistics, our AI generates summaries and turns them into straight-forward podcasts you can listen to anywhere, anytime.
+
+Give it a try, and don’t forget to leave us your feedback!
 
 ## Call TTS Test
 ```

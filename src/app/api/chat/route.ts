@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,15 +43,11 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         text: summary,
-        model_id: "eleven_monolingual_v1",
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+        model_id: "eleven_monolingual_v1"
       }),
     });
     const audioBuffer = await ttsRes.arrayBuffer();
     const audioBase64 = Buffer.from(audioBuffer).toString('base64');
-
-    // 4. Save to Supabase
-    await supabase.from('chat_logs').insert([{ question: query, answer: summary }]);
 
     return NextResponse.json({
       reply: summary,

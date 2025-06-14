@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from tts.tts import app  # ← 파일명이 tts.py이므로 여기서 app을 import
+from tts import app  # ← 파일명이 tts.py이므로 여기서 app을 import
 
 client = TestClient(app)
 

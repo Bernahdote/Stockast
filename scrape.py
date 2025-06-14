@@ -6,14 +6,17 @@ from aci.types.functions import FunctionDefinitionFormat
 from mistralai import Mistral
 from rich import print as rprint
 from rich.panel import Panel
+import yfinance as yf
+import pandas as pd
+import pandas_ta as ta
 
 load_dotenv()                                 
 
 aci     = ACI(api_key=os.getenv("ACI_API_KEY"))
-mistral = Mistral("WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde")
+mistral = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
 
-def get_keys(ticker) -> str:
+def get_keys(ticker: str) -> str:
 
     scrape_result = aci.functions.execute(
         "FIRECRAWL__SCRAPE",
@@ -38,9 +41,10 @@ def get_keys(ticker) -> str:
                 "role": "system",
                 "content": (
                     "You are given Yahoo Finance page content in Markdown. "
-                    "Write a summary of the following key numbers: "
+                    "Key numbers of interest of the stock is"
                     "price, bid, ask, change today in percent of price"
-                    "Write a free flow text summary of these key numbers. Start directly, you do not need an introducing sentence."
+                    "Write a free flow text summary of these key numbers."
+                    "Start with a podcast introduction, welcoming the listener. "
                 ),
             },
             {"role": "user", "content": markdown},
@@ -50,7 +54,7 @@ def get_keys(ticker) -> str:
     return extract_resp.choices[0].message.content 
 
 
-def get_news(ticker) -> str:
+def get_news(ticker: str) -> str:
 
         news_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
@@ -87,7 +91,8 @@ def get_news(ticker) -> str:
         return news_resp.choices[0].message.content
 
 
-def get_longer_news(ticker) -> str:
+def get_longer_news(ticker: str) -> str:
+
 
     try:
         main_news_page_scrape = aci.functions.execute(
@@ -103,18 +108,9 @@ def get_longer_news(ticker) -> str:
             "lamas"
         )
         main_news_data = main_news_page_scrape.data
-        if not main_news_data or "data" not in main_news_data or "markdown" not in main_news_data["data"]:
-            rprint(Panel("Failed to retrieve valid data structure from main news page scrape.", style="bold red"))
-            error_details = main_news_data.get("error") if main_news_data else None
-            if not error_details and hasattr(main_news_page_scrape, 'error') and main_news_page_scrape.error:
-                 error_details = main_news_page_scrape.error
-            if error_details:
-                 rprint(f"Error details: {error_details}")
-            return
+
         main_news_md = main_news_data["data"]["markdown"]
-        if not main_news_md: # Check if markdown content itself is empty
-            rprint(Panel("Markdown content is empty for main news page.", style="bold red"))
-            return
+        
             
     except Exception as e:
         rprint(Panel(f"Failed to scrape main news page: {e}", style="bold red"))
@@ -222,8 +218,78 @@ def get_longer_news(ticker) -> str:
         
     return summaries
 
+def get_sector_news(sector: str) -> str:
 
-def understand_input(text: str) -> list[str]: 
+
+    news_scrape = aci.functions.execute(
+            "FIRECRAWL__SCRAPE",
+            {
+                "body": {
+                    "url": f"https://finance.yahoo.com/sectors/{sector}/news",
+                    "formats": ["markdown"],
+                    "onlyMainContent": True,
+                    "blockAds": True,
+                }
+            },
+            "lamas",
+        )
+
+    news_md = news_scrape.data["data"]["markdown"]
+
+    news_resp = mistral.chat.complete(
+            model="mistral-large-2411",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You receive the Yahoo Finance for a specifc sector. You will find news on the page."
+                        "Please write a brief summary on how the sector is performing recently. "
+                       "In addition to this, write three paragraphs about the most relevant news about this sector in free text, not bullet points."
+                    ),
+                },
+                {"role": "user", "content": news_md},
+            ],
+        )
+
+
+    return news_resp.choices[0].message.content
+
+def get_market_news(market: str) -> str:
+    news_scrape = aci.functions.execute(
+            "FIRECRAWL__SCRAPE",
+            {
+                "body": {
+                    "url": f"https://finance.yahoo.com/markets/{market}",
+                    "formats": ["markdown"],
+                    "onlyMainContent": True,
+                    "blockAds": True,
+                }
+            },
+            "lamas",
+        )
+
+    news_md = news_scrape.data["data"]["markdown"]
+
+    news_resp = mistral.chat.complete(
+            model="mistral-large-2411",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You receive the Yahoo Finance for a specifc market. You will find news on the page."
+                        "Please write a brief summary on how the sector is performing recently. "
+                       "In addition to this, write three paragraphs about the most relevant news about this market in free text, not bullet points."
+                    ),
+                },
+                {"role": "user", "content": news_md},
+            ],
+        )
+
+
+    return news_resp.choices[0].message.content
+
+
+def understand_tickrs(text: str) -> list[str]: 
 
     resp = mistral.chat.complete(
         model="mistral-large-2411",
@@ -232,8 +298,10 @@ def understand_input(text: str) -> list[str]:
                 "role": "system",
                 "content": (
                     "You are given a string, with stocks that wants to be examined."
-                    "Return ONLY a array of the stock tickers (all CAPS, no duplicates, comma separated)"
-                    "As an example, if the user writes that they are interested in Google and Apple, you should return [AAPl, GOOGL]."
+                    "Return ONLY a array of the stock tickers (all CAPS, no duplicates, comma separated). Do not return ANYTHING else. "
+                    "As an example, if the user writes that they are interested in Apple and Google, you should return [AAPl, GOOGL]."
+                    "It can also be the case that the user asks for the three biggest tech companies, in which case you should return them."
+                    "NOTE: If no companies what so ever are mentioned, it should be left empty. "
                 ),
             },
             {"role": "user", "content": text},
@@ -245,16 +313,177 @@ def understand_input(text: str) -> list[str]:
               if t.strip(" []")]                  
     return tokens
 
+def understand_sectors(text: str) -> list[str]:
+
+    resp = mistral.chat.complete(
+        model="mistral-large-2411",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are given a string, with stocks and sectors of interest"
+                    "Return ONLY a array of the interesting sectors, according to categories below. Do not return ANYTHING else. "
+                    "Sectors are: ['technology', 'energy', 'healthcare', 'financial-services', 'consumer-cyclical', 'communication-services', 'consumer-defensive', 'industrials', 'utilities', 'real-estate', 'Basic Materials']"
+                    "As an example, if the user writes that they are interested in energy sector, you should return ['energy']."
+                    "NOTE: This is not a ticker. It can also be empty, if there is not a apparent interest in a sector."
+
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    raw = resp.choices[0].message.content          
+    tokens = [t.strip("[] ")                       
+              for t in raw.split(",")             
+              if t.strip(" []")]                  
+    return tokens
+
+def understand_markets(text: str) -> list[str]: 
+
+    resp = mistral.chat.complete(
+        model="mistral-large-2411",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are given a string, with stocks, sectors and markets of interest"
+                    "Return ONLY a array of the interesting MARKETS, according to categories below. Do not return ANYTHING else. "
+                    "Markets are: ['world-indices', 'futures', 'bonds', 'currencies', 'options', 'stocks', 'crypto', 'private-companies', 'efts', 'mutual-funds']"
+                    "As an example, if the user writes that they are interested in currencies, you should return ['currencies']."
+                    "NOTE: This is not a ticker. It can also be empty, if there is not a apparent interest in a sector."
+
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    raw = resp.choices[0].message.content          
+    tokens = [t.strip("[] ")                       
+              for t in raw.split(",")             
+              if t.strip(" []")]                  
+    return tokens
+
+def generate_podcast(text: str) -> str:
+    """
+    Generate a podcast script from the supplied news-summary text.
+    """
+    podcast_resp = mistral.chat.complete(
+        model="magistral-medium-2506",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are given a text that summarizes the latest news about specific stocks, markets and sectos. "
+                    "Generate a podcast script based on this text, making it engaging and suitable for audio format. "
+                    "Start with a catchy introduction, then give the technical analysis of the stock, "
+                    "and finally deliver the news summary. "
+                    "Use a friendly tone, speak directly to the listener, no bullet points—free text only. "
+                    "Keep it concise but informative (≈5 minutes when read aloud). "
+                    "Avoid repeating information.", 
+                    "Only return the final podcast script."
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+    )
+    return podcast_resp.choices[0].message.content
+
+def get_technical_summary(ticker: str) -> str:
+
+    """Get technical analysis summary for a given ticker."""
+    try:
+        # Download historical data
+        data = yf.download(ticker, period="3mo", interval="1d")
+        
+        if data.empty:
+            return f"Could not download data for ticker: {ticker}"
+
+        # Flatten MultiIndex columns if they exist
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = [col[0] for col in data.columns]
+
+        # Drop missing values and check if sufficient data exists
+        data = data.dropna(subset=["Close"])
+        
+        MIN_PERIODS = 26  # Minimum periods needed for all indicators
+        if len(data) < MIN_PERIODS:
+            return f"Insufficient data for {ticker}. Need at least {MIN_PERIODS} data points, got {len(data)}."
+
+        # Calculate technical indicators
+        data["RSI"] = ta.rsi(data["Close"])
+        data["SMA20"] = ta.sma(data["Close"], length=20)
+        
+        macd = ta.macd(data["Close"])
+        if macd is not None and not macd.empty:
+            required_cols = ['MACD_12_26_9', 'MACDh_12_26_9', 'MACDs_12_26_9']
+            if all(col in macd.columns for col in required_cols):
+                data = pd.concat([data, macd[required_cols]], axis=1)
+            else:
+                return f"MACD calculation failed for {ticker}: missing columns."
+        else:
+            return f"MACD calculation failed for {ticker}."
+
+        # Generate summary
+        latest = data.iloc[-1]
+        summary_lines = []
+
+        # Analyze price vs SMA20
+        if pd.notna(latest.get("SMA20")):
+            trend = "above" if latest["Close"] > latest["SMA20"] else "below"
+            strength = "strength" if trend == "above" else "weakness"
+            summary_lines.append(f"Trading {trend} 20-day average, indicating short-term {strength}.")
+
+        # Analyze RSI
+        if pd.notna(latest.get("RSI")):
+            rsi_val = latest["RSI"]
+            if rsi_val > 70:
+                summary_lines.append("RSI above 70 suggests the stock may be overbought.")
+            elif rsi_val < 30:
+                summary_lines.append("RSI below 30 indicates the stock might be oversold.")
+            else:
+                summary_lines.append("RSI in neutral range, showing balanced momentum.")
+
+        # Analyze MACD
+        if pd.notna(latest.get("MACD_12_26_9")):
+            momentum = "bullish" if latest["MACD_12_26_9"] > 0 else "bearish"
+            summary_lines.append(f"MACD indicates {momentum} momentum.")
+
+        # Format output
+        date_str = latest.name.date() if hasattr(latest.name, 'date') else "latest"
+        output = f"\n📊 Technical Summary for {ticker} ({date_str}):\n"
+        output += f"Closing Price: ${latest['Close']:.2f}\n"
+        output += "\n".join(f"- {line}" for line in summary_lines)
+        
+        return output
+        
+    except Exception as e:
+        return f"Error analyzing {ticker}: {str(e)}"
 
 if __name__ == "__main__": 
 
-    keys = understand_input("I'm interested in Google, Nividia and Apple stocks") 
+
+    input = "I'm interested in Google and materials and currencies"  
+    keys = understand_tickrs(input) 
+    sectors = understand_sectors(input) 
+    markets = understand_markets(input)
 
     print(keys) 
+    print(sectors)
+    print(markets)
+
+
     sum = ""
     for key in keys: 
         keyfacts = get_keys(key) 
         news = get_news(key)
         sum = sum.join([keyfacts, news])
+    
+    for sec in sectors: 
+        sec_news = get_sector_news(sec)
+        sum = sum.join([sec_news])
+
+    for market in markets:
+        market_news = get_market_news(market)
+        sum = sum.join([market_news])
 
     print(sum)

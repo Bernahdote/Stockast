@@ -3,58 +3,46 @@ from dotenv import load_dotenv
 from aci import ACI
 from mistralai import Mistral
 from rich import print as rprint
-from rich.panel import Panel
 
-load_dotenv()
-OWNER_ID = "lamas"
-MISTRAL_API_KEY="WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde"
+load_dotenv()                                  # needs ACI_API_KEY & MISTRAL_API_KEY
 
-key = os.getenv("ACI_API_KEY")
+aci     = ACI(api_key=os.getenv("ACI_API_KEY"))
+mistral = Mistral("WPu0KpNOAUFviCzNgnbWQuRbz7Zpwyde")
 
-mistral = Mistral(MISTRAL_API_KEY)
-aci = ACI(api_key=os.getenv("ACI_API_KEY"))
+# 1. Scrape the Yahoo Finance page via Firecrawl (markdown output)
+scrape_result = aci.functions.execute(
+    "FIRECRAWL__SCRAPE",
+    {
+        "body": {
+            "url": "https://finance.yahoo.com/quote/AAPL",
+            "formats": ["markdown"],
+            "onlyMainContent": True,
+            "blockAds": True,
+        }
+    },
+    "lamas"  # Firecrawl account name in ACI
+)
 
-def main() -> None: 
+if not scrape_result.success or scrape_result.data is None:
+    rprint(f"[red]Scrape failed:[/red] {scrape_result.error}")
+    raise SystemExit
 
-    functions = aci.functions.get_definition(
-        "BRAVE_SEARCH__WEB_SEARCH"
-    )
-    
-    rprint(Panel("Brave search function definition", style="bold blue"))
-    rprint(functions)
+markdown = scrape_result.data["data"]["markdown"]  # ← actual page text
 
-    response = mistral.chat.complete(
-        model="mistral-large-2411",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant with access to a variety of tools.",
-            },
-            {
-                "role": "user",
-                "content": "What is the Google link?",
-            },
-        ],
-        tools=[functions],
-        tool_choice="required",  # force the model to generate a tool call for demo purposes
-    )
+# 2. Let Mistral extract price, market-cap, and P/E
+extract_resp = mistral.chat.complete(
+    model="mistral-large-2411",
+    messages=[
+        {
+            "role": "system",
+            "content": (
+                "You are given Yahoo Finance page content in Markdown. "
+                "Return exactly three fields as JSON: "
+                "`price`, `marketCap`, and `peRatio`."
+            ),
+        },
+        {"role": "user", "content": markdown},
+    ],
+)
 
-    tool_call = (
-        response.choices[0].message.tool_calls[0]
-        if response.choices[0].message.tool_calls
-        else None
-    )
-
-    if tool_call:
-        rprint(Panel(f"Tool call: {tool_call.function.name}", style="bold green"))
-        rprint(f"arguments: {tool_call.function.arguments}")
-
-        result = aci.functions.execute(
-            tool_call.function.name,
-            json.loads(tool_call.function.arguments),
-            linked_account_owner_id=OWNER_ID,
-        )
-        rprint(Panel("Function Call Result", style="bold yellow"))
-        rprint(result)
-
-main()
+rprint(extract_resp.choices[0].message.content)

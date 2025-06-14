@@ -112,6 +112,15 @@ src/
 - Save chat history to Supabase
 - View chat history
 
+### Backend (scrape.py) 
+
+* The functions understand_tickers(), understand_sectors() and understand_markets() all take a string as in input and analyzes which tickers, sectors and markets respectively that the user is interested in in an array []. 
+* The function get_keys() takes a string as a ticker and returns a string of brief key analytics of the stock. 
+* The function get_news() takes a string as a ticker and returns a string of brief news about this stock. 
+* The function get_market_news() and get_sector_news() takes a string as market/sector (as given from understand_sectors() or understand_markets()) and returns a string that describes important news of this market/sector. 
+* See main method in scrape.py for example of usage with an example input. 
+
+
 ## Contributing
 
 Feel free to submit issues and enhancement requests.

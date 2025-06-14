@@ -1,20 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  gender: string;
+  description: string;
+}
 
 export default function TTSPage() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [voiceSettings, setVoiceSettings] = useState({
-    stability: 0.5,
-    similarity_boost: 0.75
-  });
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
+
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        const response = await fetch('/api/voices');
+        if (!response.ok) {
+          throw new Error('Failed to fetch voices');
+        }
+        const data = await response.json();
+        setVoices(data);
+        if (data.length > 0) {
+          setSelectedVoice(data[0].voice_id);
+        }
+      } catch (error) {
+        console.error('Error fetching voices:', error);
+        setError('Failed to load voice models');
+      }
+    };
+
+    fetchVoices();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || isLoading) return;
+    if (!text.trim() || isLoading || !selectedVoice) return;
 
     setIsLoading(true);
     setError(null);
@@ -28,7 +54,7 @@ export default function TTSPage() {
         },
         body: JSON.stringify({
           text,
-          ...voiceSettings
+          voice_id: selectedVoice
         }),
       });
 
@@ -47,19 +73,38 @@ export default function TTSPage() {
     }
   };
 
-  const handleVoiceSettingChange = (setting: 'stability' | 'similarity_boost', value: number) => {
-    setVoiceSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
-  };
+  const selectedVoiceInfo = voices.find(voice => voice.voice_id === selectedVoice);
 
   return (
     <main className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">Text to Speech with Voice Adjustment</h1>
+        <h1 className="text-2xl font-bold mb-6 text-gray-800">Text to Speech</h1>
         
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="voice" className="block text-sm font-medium text-gray-800 mb-2">
+              Select Voice
+            </label>
+            <select
+              id="voice"
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+              disabled={isLoading}
+            >
+              {voices.map((voice) => (
+                <option key={voice.voice_id} value={voice.voice_id}>
+                  {voice.name} ({voice.gender})
+                </option>
+              ))}
+            </select>
+            {selectedVoiceInfo && (
+              <p className="mt-2 text-sm text-gray-600">
+                {selectedVoiceInfo.description}
+              </p>
+            )}
+          </div>
+
           <div>
             <label htmlFor="text" className="block text-sm font-medium text-gray-800 mb-2">
               Enter Text
@@ -75,40 +120,6 @@ export default function TTSPage() {
             />
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-800 mb-2">
-                Voice Stability: <span className="text-blue-600 font-semibold">{voiceSettings.stability}</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={voiceSettings.stability}
-                onChange={(e) => handleVoiceSettingChange('stability', parseFloat(e.target.value))}
-                className="w-full"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-800 mb-2">
-                Voice Similarity: <span className="text-blue-600 font-semibold">{voiceSettings.similarity_boost}</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={voiceSettings.similarity_boost}
-                onChange={(e) => handleVoiceSettingChange('similarity_boost', parseFloat(e.target.value))}
-                className="w-full"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
           {error && (
             <div className="p-3 bg-red-100 text-red-800 rounded-lg font-medium">
               {error}
@@ -117,9 +128,9 @@ export default function TTSPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !selectedVoice}
             className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
-              isLoading 
+              isLoading || !selectedVoice
                 ? 'bg-gray-400 cursor-not-allowed' 
                 : 'bg-blue-600 hover:bg-blue-700'
             }`}
@@ -137,12 +148,6 @@ export default function TTSPage() {
             </audio>
           </div>
         )}
-
-        <div className="mt-6 text-sm text-gray-700 space-y-1">
-          <p className="font-medium">• Voice Stability: Value between 0-1, higher values result in more stable voice</p>
-          <p className="font-medium">• Voice Similarity: Value between 0-1, higher values make the voice more similar to the original</p>
-          <p className="font-medium">• The converted audio will be played directly in the browser</p>
-        </div>
       </div>
     </main>
   );

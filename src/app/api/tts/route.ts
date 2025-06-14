@@ -2,22 +2,21 @@ import { NextResponse } from 'next/server';
 
 interface TTSRequest {
   text: string;
-  stability?: number;
-  similarity_boost?: number;
+  voice_id: string;
 }
 
 export async function POST(request: Request) {
   try {
-    const { text, stability = 0.5, similarity_boost = 0.75 } = await request.json() as TTSRequest;
+    const { text, voice_id } = await request.json() as TTSRequest;
 
-    if (!text) {
+    if (!text || !voice_id) {
       return NextResponse.json(
-        { error: 'Text is required' },
+        { error: 'Text and voice_id are required' },
         { status: 400 }
       );
     }
 
-    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`, {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',
@@ -26,11 +25,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: {
-          stability,
-          similarity_boost
-        }
+        model_id: 'eleven_monolingual_v1'
       }),
     });
 

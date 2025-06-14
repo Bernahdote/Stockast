@@ -477,7 +477,6 @@ if __name__ == "__main__":
         news = get_news(key)
         tecnical_summary = get_technical_summary(key)
         sum = sum + f"\n\n{keyfacts}\n\n{tecnical_summary}\n\n{news}\n\n"
-    
     # Parse sectors string to extract actual sector names
     if isinstance(sectors, str):
         # Remove brackets and quotes, then split by comma

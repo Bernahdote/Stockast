@@ -41,7 +41,7 @@ def main() -> None:
                 },
                 {
                     "role": "user",
-                    "content": "Navigate to https://finance.yahoo.com/quote/AAPL/. Scrape the data with FIRECRAWL__SEARCH. With the scraped data, extract the price, change in percent together with bid and ask. Return a summary in free text of these keys"
+                    "content": "Navigate to https://finance.yahoo.com/quote/AAPL/. Scrape the data with FIRECRAWL__SEARCH. With the scraped data, extract ONLY: price, change in percen, bid and ask. Return a summary in free text of ONLY these keys"
                 },
             ]
             + chat_history,

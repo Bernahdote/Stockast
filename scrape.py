@@ -8,6 +8,7 @@ from rich import print as rprint
 from rich.panel import Panel
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import pandas_ta as ta
 import ast 
 import time
@@ -54,7 +55,12 @@ def get_keyfacts(ticker: str) -> str:
         ],
     )
 
-    return extract_resp.choices[0].message.content 
+        logger.info(f"Key facts summary generated for {ticker}")
+        return extract_resp.choices[0].message.content 
+
+    except Exception as e:
+        logger.error(f"Error in get_keyfacts for {ticker}: {str(e)}")
+        return f"Error fetching key facts for {ticker}: {str(e)}"
 
 def get_news_bullets(ticker: str) -> str:
     try:
@@ -114,7 +120,7 @@ def get_news(ticker: str) -> str:
 
 
         news_resp = mistral.chat.complete(
-            model="mistral-large-2411",
+            model="mistral-large-latest",
             messages=[
                 {
                     "role": "system",
@@ -126,9 +132,13 @@ def get_news(ticker: str) -> str:
                 {"role": "user", "content": news_md},
             ],
         )
-
-
+        
+        logger.info(f"News summary generated for {ticker}")
         return news_resp.choices[0].message.content
+
+    except Exception as e:
+        logger.error(f"Error in get_news for {ticker}: {str(e)}")
+        return f"Error fetching news for {ticker}: {str(e)}"
 
 def get_longer_news(ticker: str) -> str:
 
@@ -288,9 +298,13 @@ def get_sector_news(sector: str) -> str:
                 {"role": "user", "content": news_md},
             ],
         )
+        
+        logger.info(f"Sector news summary generated for {sector}")
+        return news_resp.choices[0].message.content
 
-
-    return news_resp.choices[0].message.content
+    except Exception as e:
+        logger.error(f"Error in get_sector_news for {sector}: {str(e)}")
+        return f"Error fetching sector news for {sector}: {str(e)}"
 
 def get_market_news(market: str) -> str:
     news_scrape = aci.handle_function_call(
@@ -324,6 +338,10 @@ def get_market_news(market: str) -> str:
     time.sleep(1)
 
     return news_resp.choices[0].message.content
+
+    except Exception as e:
+        logger.error(f"Error in get_market_news for {market}: {str(e)}")
+        return f"Error fetching market news for {market}: {str(e)}"
 
 def understand_tickrs(text: str) -> list[str]: 
 
@@ -396,90 +414,92 @@ def generate_podcast(text: str) -> str:
     """
     Generate a podcast script from the supplied news-summary text.
     """
-    podcast_resp = mistral.chat.complete(
-        model="magistral-medium-2506",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are given a content text that summarizes the latest news about specific stocks, markets and sectors. "
-                    "Generate a podcast script based on this text, making it engaging and suitable for audio format. "
-                    "DO NOT USE ANY THINKING OR REASONING IN THE ANSWER, JUST GENERATE THE PODCAST SCRIPT. "
-                    "Start with a catchy introduction"
-                    "Keep the information of the stock, sector and market similar in length, so that the podcast is balanced. "
-                    "Do absolutely not make the text longer than 8000 charachters!"
-                    "Use a friendly tone, speak directly to the listener, no bullet points—free text only. "
-                    "Keep it concise but informative (about 5 minutes when read aloud). "
-                    "Avoid repeating information." 
-                    "Only return the final podcast script."
-                    "No more delimiters like [Outro] or [Intro]. "
-                    "no Host:"
-                    "no [Closing music] or ### Final Podcast Script" 
-                    "ONLY RETURN THE FINAL PODCAST SCRIPT READY TO BE READ OUTLOUD, NOTHING ELSE! "
-                ),
-            },
-            {"role": "user", "content": text},
-        ],
-    )
-    return podcast_resp.choices[0].message.content
+    try:
+        logger.info("Generating podcast script")
+        start_time = time.time()
+        
+        podcast_resp = mistral.chat.complete(
+            model="mistral-large-latest",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are given a content text that summarizes the latest news about specific stocks, markets and sectors. "
+                        "Generate a podcast script based on this text, making it engaging and suitable for audio format. "
+                        "DO NOT USE ANY THINKING OR REASONING IN THE ANSWER, JUST GENERATE THE PODCAST SCRIPT. "
+                        "Start with a catchy introduction"
+                        "Keep the information of the stock, sector and market similar in length, so that the podcast is balanced. "
+                        "Do absolutely not make the text longer than 8000 charachters!"
+                        "Use a friendly tone, speak directly to the listener, no bullet points—free text only. "
+                        "Keep it concise but informative (about 5 minutes when read aloud). "
+                        "Avoid repeating information." 
+                        "Only return the final podcast script."
+                        "No more delimiters like [Outro] or [Intro]. "
+                        "no Host:"
+                        "no [Closing music] or ### Final Podcast Script"
+                        "return the thinking process in <thinking> and </thinking>"
+                        "return the final podcast script after [Final Podcast Script]"
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+        )
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"Podcast script generated in {elapsed_time:.2f} seconds")
+        
+        return podcast_resp.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"Error in generate_podcast: {str(e)}")
+        return f"Error generating podcast: {str(e)}"
 
 def get_technical_summary(ticker: str) -> str:
-
-    """Get technical analysis summary for a given ticker."""
     try:
-        # Download historical data
-        data = yf.download(ticker, period="3mo", interval="1d", auto_adjust= False, progress=False)
-
-        # Flatten MultiIndex columns if they exist
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = [col[0] for col in data.columns]
-
-        # Drop missing values and check if sufficient data exists
-        data = data.dropna(subset=["Close"])
+        logger.info(f"Fetching technical analysis for {ticker}")
+        start_time = time.time()
         
-        MIN_PERIODS = 26  # Minimum periods needed for all indicators
-        if len(data) < MIN_PERIODS:
-            return f"Insufficient data for {ticker}. Need at least {MIN_PERIODS} data points, got {len(data)}."
-
-        # Calculate technical indicators
-        data["RSI"] = ta.rsi(data["Close"])
-        data["SMA20"] = ta.sma(data["Close"], length=20)
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="1mo")
         
-        macd = ta.macd(data["Close"])
-        if macd is not None and not macd.empty:
-            required_cols = ['MACD_12_26_9', 'MACDh_12_26_9', 'MACDs_12_26_9']
-            if all(col in macd.columns for col in required_cols):
-                data = pd.concat([data, macd[required_cols]], axis=1)
-            else:
-                return f"MACD calculation failed for {ticker}: missing columns."
-        else:
-            return f"MACD calculation failed for {ticker}."
-
-        # Generate summary
-        latest = data.iloc[-1]
+        if hist.empty:
+            logger.error(f"No historical data found for {ticker}")
+            return f"Error analyzing {ticker}: No historical data"
+            
+        # 기술적 지표 계산
+        hist['SMA_20'] = hist['Close'].rolling(window=20).mean()
+        hist['RSI'] = ta.rsi(hist['Close'])
+        macd = ta.macd(hist['Close'])
+        hist['MACD'] = macd['MACD_12_26_9']
+        hist['MACD_Signal'] = macd['MACDs_12_26_9']
+        
+        latest = hist.iloc[-1]
         summary_lines = []
-
-        # Analyze price vs SMA20
-        if pd.notna(latest.get("SMA20")):
-            trend = "above" if latest["Close"] > latest["SMA20"] else "below"
-            strength = "strength" if trend == "above" else "weakness"
-            summary_lines.append(f"Trading {trend} 20-day average, indicating short-term {strength}.")
-
-        # Analyze RSI
-        if pd.notna(latest.get("RSI")):
-            rsi_val = latest["RSI"]
-            if rsi_val > 70:
-                summary_lines.append("RSI above 70 suggests the stock may be overbought.")
-            elif rsi_val < 30:
-                summary_lines.append("RSI below 30 indicates the stock might be oversold.")
-            else:
-                summary_lines.append("RSI in neutral range, showing balanced momentum.")
-
-        # Analyze MACD
-        if pd.notna(latest.get("MACD_12_26_9")):
-            momentum = "bullish" if latest["MACD_12_26_9"] > 0 else "bearish"
-            summary_lines.append(f"MACD indicates {momentum} momentum.")
-
+        
+        # 이동평균선 분석
+        if latest['Close'] > latest['SMA_20']:
+            summary_lines.append("Price is above 20-day moving average, indicating bullish trend.")
+        else:
+            summary_lines.append("Price is below 20-day moving average, indicating bearish trend.")
+            
+        # RSI 분석
+        if latest['RSI'] > 70:
+            summary_lines.append("RSI indicates overbought conditions.")
+        elif latest['RSI'] < 30:
+            summary_lines.append("RSI indicates oversold conditions.")
+        else:
+            summary_lines.append("RSI is in neutral territory.")
+            
+        # MACD 분석
+        if latest['MACD'] > latest['MACD_Signal']:
+            momentum = "bullish"
+        else:
+            momentum = "bearish"
+        summary_lines.append(f"MACD indicates {momentum} momentum.")
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"Technical analysis completed for {ticker} in {elapsed_time:.2f} seconds")
+        
         # Format output
         date_str = latest.name.date() if hasattr(latest.name, 'date') else "latest"
         output = f"Technical Summary for {ticker} ({date_str}):\n"
@@ -489,6 +509,7 @@ def get_technical_summary(ticker: str) -> str:
         return output
         
     except Exception as e:
+        logger.error(f"Error in get_technical_summary for {ticker}: {str(e)}")
         return f"Error analyzing {ticker}: {str(e)}"
 
 if __name__ == "__main__": 

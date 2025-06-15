@@ -17,7 +17,7 @@ aci     = ACI(api_key=os.getenv("ACI_API_KEY"))
 mistral = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
 
-def get_keys(ticker: str) -> str:
+def get_keyfacts(ticker: str) -> str:
 
     scrape_result = aci.functions.execute(
         "FIRECRAWL__SCRAPE",
@@ -53,7 +53,7 @@ def get_keys(ticker: str) -> str:
 
     return extract_resp.choices[0].message.content 
 
-def get_key_note(ticker: str) -> str:
+def get_news_bullets(ticker: str) -> str:
     try:
         news_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     summary = "" 
 
     for key in keys:
-        summary += get_keys(key) 
+        summary += get_keyfacts(key) 
         summary += get_technical_summary(key)
         summary += get_news(key) 
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import ast
 import uvicorn
 from tts import speak_and_download, TTSRequest
-from scrape import understand_tickrs, get_keys, get_news, understand_markets, understand_sectors, get_technical_summary, get_sector_news, get_market_news, generate_podcast
+from scrape import understand_tickrs, get_keyfacts, get_news, understand_markets, understand_sectors, get_technical_summary, get_sector_news, get_market_news, generate_podcast
 
 app = FastAPI()
 
@@ -29,7 +29,7 @@ async def process_text(request: TextRequest):
         summary = ""
 
         for key in keys:
-            summary += get_keys(key) 
+            summary += get_keyfacts(key) 
             summary += get_technical_summary(key)
             summary += get_news(key) 
 

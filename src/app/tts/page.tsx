@@ -78,7 +78,7 @@ export default function TTSPage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
-      <div className="max-w-[1200px] mx-auto px-4 py">
+      <div className="max-w-[1200px] mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold text-gray-900">
           Generate Podcast
         </h1>

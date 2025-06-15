@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { podcastState } from '../store/atoms';
-import { ChevronDown, Play, Pause } from 'lucide-react';
+import { ChevronDown, Play, Pause, Pencil, ChevronUp } from 'lucide-react';
 import { FaUserTie, FaUserNurse } from 'react-icons/fa';
 
 interface Voice {
@@ -78,6 +78,8 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
   const [error, setError] = useState<string | null>(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [visibleLogCount, setVisibleLogCount] = useState(4);
+  const [inputTextArea, setInputTextArea] = useState<string>("");
+  const [isEditingInput, setIsEditingInput] = useState(false);
 
   // selectedVoice를 voice_id로 관리
   const selectedVoice = podcast.selectedVoice || selectedVoiceState;
@@ -320,9 +322,55 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
       <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 flex items-center gap-8">
         <div className="flex-1">
           <label className="block text-lg font-bold text-gray-900 mb-2">Your Input</label>
-          <div className="bg-gray-50 rounded-xl p-4 text-gray-600 text-lg">
-            {podcast.inputText}
+          <div className="relative group">
+            <div className="bg-gray-50 rounded-xl p-4 text-gray-600 text-lg min-h-[80px] whitespace-pre-wrap">
+              {podcast.inputText}
+              <button
+                className="absolute bottom-3 right-3 border border-blue-300 bg-white rounded-full p-1.5 shadow hover:border-blue-600 transition-colors"
+                onClick={() => {
+                  setInputTextArea(podcast.inputText);
+                  setIsEditingInput(true);
+                }}
+                aria-label="Edit"
+                style={{ zIndex: 2 }}
+              >
+                <Pencil size={20} className="text-blue-600" />
+              </button>
+            </div>
           </div>
+          {isEditingInput && (
+            <form
+              className="relative"
+              onSubmit={e => {
+                e.preventDefault();
+                setPodcast(prev => ({ ...prev, inputText: inputTextArea }));
+                setIsEditingInput(false);
+              }}
+            >
+              <textarea
+                value={inputTextArea}
+                onChange={e => setInputTextArea(e.target.value)}
+                className="w-full min-h-[80px] bg-gray-50 rounded-xl p-4 text-gray-600 text-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-400 pr-12"
+                placeholder="Enter your script or text here..."
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    setPodcast(prev => ({ ...prev, inputText: inputTextArea }));
+                    setIsEditingInput(false);
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                className="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg flex items-center justify-center"
+                style={{ zIndex: 2 }}
+                aria-label="Save"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </button>
+            </form>
+          )}
         </div>
         <div className="w-64">
           <label className="block text-sm font-medium text-gray-700 mb-2">Voice</label>
@@ -476,7 +524,7 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
               ))}
               <button
                 onClick={handleDownload}
-                className="px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2 border border-blue-200"
+                className="px-4 py-2 bg-blue-50 text-gray-700 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2 border border-blue-200"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

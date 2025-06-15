@@ -18,7 +18,7 @@ export default function Header() {
         </div>
       </header>
       {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/20 z-50">
           <div className="bg-white rounded-3xl shadow-2xl p-12 min-w-[400px] min-h-[220px] flex flex-col items-center relative">
             <button
               className="absolute top-6 right-6 text-gray-400 hover:text-blue-600 transition-colors text-3xl"

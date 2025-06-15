@@ -39,17 +39,17 @@ async def generate_podcast_text(request: TextRequest):
             input = request.text
             
             # 생각하는 과정 스트리밍
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Analyzing market trends...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Analyzing Market Trends...'})}\n\n"
             keys = understand_tickrs(input) or []
             await asyncio.sleep(1)  # 실제 처리 시간을 시뮬레이션
             
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Gathering financial data...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Gathering Financial Data...'})}\n\n"
             sectors = understand_sectors(input) or "[]"
             markets = understand_markets(input) or "[]"
             await asyncio.sleep(1)
             
             summary = ""
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating comprehensive analysis...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating Comprehensive Analysis...'})}\n\n"
             
             for key in keys:
                 summary += get_keyfacts(key) or ""
@@ -74,8 +74,11 @@ async def generate_podcast_text(request: TextRequest):
                 summary += get_market_news(market) or ""
                 await asyncio.sleep(0.5)
             
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Structuring podcast content...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Structuring Podcast Content...'})}\n\n"
             podcast = generate_podcast(summary) or ""
+            
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating Podcast Script...'})}\n\n"
+            await asyncio.sleep(1)
             
             # 최종 스크립트 전송
             yield f"data: {json.dumps({'type': 'script', 'content': podcast})}\n\n"
@@ -99,65 +102,6 @@ async def generate_audio(request: TTSRequest):
     except Exception as e:
         print(f"Error in generate_audio: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/generate-podcast-text")
-async def generate_podcast_text(text: str):
-    if not text:
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
-
-    async def generate():
-        try:
-            input = text
-            
-            # 생각하는 과정 스트리밍
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Analyzing market trends...'})}\n\n"
-            keys = understand_tickrs(input) or []
-            await asyncio.sleep(1)  # 실제 처리 시간을 시뮬레이션
-            
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Gathering financial data...'})}\n\n"
-            sectors = understand_sectors(input) or "[]"
-            markets = understand_markets(input) or "[]"
-            await asyncio.sleep(1)
-            
-            summary = ""
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating comprehensive analysis...'})}\n\n"
-            
-            for key in keys:
-                summary += get_keyfacts(key) or ""
-                summary += get_technical_summary(key) or ""
-                summary += get_news(key) or ""
-                await asyncio.sleep(0.5)
-            
-            try:
-                sectors = ast.literal_eval(sectors)
-            except Exception:
-                sectors = []
-            try:
-                markets = ast.literal_eval(markets)
-            except Exception:
-                markets = []
-            
-            for sec in sectors:
-                summary += get_sector_news(sec) or ""
-                await asyncio.sleep(0.5)
-            
-            for market in markets:
-                summary += get_market_news(market) or ""
-                await asyncio.sleep(0.5)
-            
-            yield f"data: {json.dumps({'type': 'log', 'message': 'Structuring podcast content...'})}\n\n"
-            podcast = generate_podcast(summary) or ""
-            
-            # 최종 스크립트 전송
-            yield f"data: {json.dumps({'type': 'script', 'content': podcast})}\n\n"
-            
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-    
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream"
-    )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=120) 

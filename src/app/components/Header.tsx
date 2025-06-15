@@ -8,7 +8,7 @@ export default function Header() {
     <>
       <header className="w-full px-6 py-4 mx-auto sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm transition-all duration-300">
         <div className="flex justify-between items-center max-w-[1200px] mx-auto">
-          <Link href="/" className="text-2xl font-bold text-blue-600 hover:underline cursor-pointer">Stockast</Link>
+          <Link href="/" className="text-4xl font-bold text-blue-600 hover:no-underline hover:text-blue-700 cursor-pointer">Stockast</Link>
           <button
             className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             onClick={() => setShowModal(true)}

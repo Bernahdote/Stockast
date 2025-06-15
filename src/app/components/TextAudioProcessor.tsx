@@ -19,37 +19,41 @@ interface TextAudioProcessorProps {
   voices: Voice[];
 }
 
-// progressMessages를 컴포넌트 바깥에 선언
+// Declare progressMessages outside the component
 const PROGRESS_MESSAGES = [
-  "Analyzing market trends...",
-  "Gathering financial data...",
-  "Generating comprehensive analysis...",
-  "Structuring podcast content...",
-  "Script Generation Completed",
-  "Audio Generation Completed"
+  "Analyzing Market Trends...",
+  "Gathering Financial Data...",
+  "Generating Comprehensive Analysis...",
+  "Structuring Podcast Content...",
+  "Generating Podcast Script...",
+  "Generating Podcast Audio..."
 ];
 
-// 파싱 함수 추가
+const COMPLETED_MESSAGES = [
+  "Analyzing Market Trends Completed",
+  "Gathering Financial Data Completed",
+  "Generating Comprehensive Analysis Completed",
+  "Structuring Podcast Content Completed",
+  "Generating Podcast Script Completed",
+  "Generating Podcast Audio Completed"
+];
+
+// Improved parsing function
 function parsePodcastContent(content: string) {
-  // 1. 상태 로그 추출
+  // 1. Extract status log (<think> ... </think>)
   let log = '';
-  const thinkMatch = content.match(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/i);
+  const thinkMatch = content.match(/<think[>\s]([\s\S]*?)<\/think>/i);
   if (thinkMatch) {
-    log = thinkMatch[0]
-      .replace(/<think(?:ing)?>/i, '')
-      .replace(/<\/think(?:ing)?>/i, '')
-      .trim();
+    log = thinkMatch[1].trim();
   }
 
-  // 2. 최종 스크립트 추출
+  // 2. Extract final script ([Final Podcast Script] ... [End of Podcast Script])
   let script = '';
-  const scriptMatch = content.match(/\[Final Podcast Script\]([\s\S]*)$/i);
+  const scriptMatch = content.match(/\[Final Podcast Script\]([\s\S]*?)\[End of Podcast Script\]/i);
   if (scriptMatch) {
     script = scriptMatch[1].trim();
   }
 
-  console.log("log after parsing", log);
-  console.log("script after parsing", script);
   return { log, script };
 }
 
@@ -82,17 +86,20 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
   const [visibleLogCount, setVisibleLogCount] = useState(4);
   const [inputTextArea, setInputTextArea] = useState<string>("");
   const [isEditingInput, setIsEditingInput] = useState(false);
+  const [visibleScriptLines, setVisibleScriptLines] = useState<string[]>([]);
+  const [currentHighlightedWord, setCurrentHighlightedWord] = useState<string>('');
+  const [highlightedWordIndex, setHighlightedWordIndex] = useState<number>(-1);
 
   // selectedVoice를 voice_id로 관리
   const selectedVoice = podcast.selectedVoice || selectedVoiceState;
 
-  // 로그를 순차적으로 표시하는 함수
+  // Function to display logs sequentially
   const showLogsSequentially = (logs: string[]) => {
     setVisibleLogs([]);
     logs.forEach((log, index) => {
       setTimeout(() => {
         setVisibleLogs(prev => [...prev, log]);
-      }, index * 1500); // 1.5초 간격으로 로그 표시
+      }, index * 1500); // Display logs at 1.5 second intervals
     });
   };
 
@@ -113,41 +120,58 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
         setProgressIndex(0);
 
         try {
-          const eventSource = new EventSource(`/api/generate-podcast-text?text=${encodeURIComponent(podcast.inputText)}`);
-          
-          eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'log') {
-              setProcessingLogs(prev => [...prev, data.message]);
-              if (!PROGRESS_MESSAGES.includes(data.message)) {
-                setThinkingLogs(prev => [...prev, { message: data.message, type: 'log' }]);
-              }
-              setProgressIndex(prev => prev + 1);
-            } else if (data.type === 'script') {
-              const { log, script } = parsePodcastContent(data.content);
-              const filteredLog = log.split('\n').filter(line => line.trim() && !PROGRESS_MESSAGES.includes(line.trim()));
-              setThinkingLogs(filteredLog.map(line => ({ message: line, type: 'log' })));
-              setFinalScript(script);
-              setGeneratedScript(script.split('\n').filter(line => line.trim()));
-              setProgressIndex(5); // Script Generation Completed 표시
-              generateAudio(script);
-              eventSource.close();
-              setIsGeneratingScript(false);
-            } else if (data.type === 'error') {
-              console.error('Error:', data.message);
-              setThinkingLogs(prev => [...prev, { message: data.message, type: 'error' }]);
-              eventSource.close();
-              setIsGeneratingScript(false);
-            }
-          };
+          const response = await fetch('/api/generate-podcast-text', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: podcast.inputText,
+              voice_id: selectedVoiceState
+            })
+          });
 
-          eventSource.onerror = (error) => {
-            console.error('EventSource error:', error);
-            setThinkingLogs(prev => [...prev, { message: 'Failed to generate script. Please try again.', type: 'error' }]);
-            eventSource.close();
-            setIsGeneratingScript(false);
-          };
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+
+          if (!reader) {
+            throw new Error('Failed to get response reader');
+          }
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'log') {
+                  setProcessingLogs(prev => [...prev, data.message]);
+                  if (!PROGRESS_MESSAGES.includes(data.message)) {
+                    setThinkingLogs(prev => [...prev, { message: data.message, type: 'log' }]);
+                  }
+                  setProgressIndex(prev => prev + 1);
+                } else if (data.type === 'script') {
+                  const { log, script } = parsePodcastContent(data.content);
+                  const filteredLog = log.split('\n').filter(line => line.trim() && !PROGRESS_MESSAGES.includes(line.trim()));
+                  setThinkingLogs(filteredLog.map(line => ({ message: line, type: 'log' })));
+                  setFinalScript(script);
+                  setGeneratedScript(script.split('\n').filter(line => line.trim()));
+                  setProgressIndex(5); // Script Generation Completed 표시
+                  generateAudio(script);
+                  setIsGeneratingScript(false);
+                } else if (data.type === 'error') {
+                  console.error('Error:', data.message);
+                  setThinkingLogs(prev => [...prev, { message: data.message, type: 'error' }]);
+                  setIsGeneratingScript(false);
+                }
+              }
+            }
+          }
         } catch (error) {
           console.error('Error:', error);
           setThinkingLogs(prev => [...prev, { message: 'Failed to generate script. Please try again.', type: 'error' }]);
@@ -244,16 +268,75 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // 스크립트가 생성되면 단어 타이밍 계산
+  // Function to display script gradually
   useEffect(() => {
-    if (generatedScript.length > 0) {
-      // 각 줄을 단어로 분리하고 띄어쓰기 유지
-      const allWords = generatedScript.flatMap(line => line.split(/(\s+)/));
+    if (finalScript && !isGeneratingScript) {
+      const lines = finalScript.split('\n').filter(line => line.trim());
+      let currentIndex = 0;
+
+      const showNextLines = () => {
+        if (currentIndex < lines.length) {
+          const nextLines = lines.slice(currentIndex, currentIndex + 4);
+          setVisibleScriptLines(prev => [...prev, ...nextLines]);
+          currentIndex += 4;
+          
+          // Update progress index when script is fully displayed
+          if (currentIndex >= lines.length) {
+            setProgressIndex(5); // Script Generation Completed
+          }
+        }
+      };
+
+      // Start showing script immediately after script generation
+      showNextLines();
+      const interval = setInterval(() => {
+        if (currentIndex >= lines.length) {
+          clearInterval(interval);
+        } else {
+          showNextLines();
+        }
+      }, 2000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [finalScript, isGeneratingScript]);
+
+  // Update highlighted word based on audio playback
+  useEffect(() => {
+    if (audioRef.current && wordTimings.length > 0) {
+      const updateHighlight = () => {
+        const currentTime = audioRef.current?.currentTime || 0;
+        const currentWordIndex = wordTimings.findIndex(
+          timing => currentTime >= timing.startTime && currentTime <= timing.endTime
+        );
+        
+        if (currentWordIndex !== -1 && currentWordIndex !== highlightedWordIndex) {
+          setHighlightedWordIndex(currentWordIndex);
+          setCurrentHighlightedWord(wordTimings[currentWordIndex].word);
+        }
+      };
+
+      const handleTimeUpdate = () => {
+        requestAnimationFrame(updateHighlight);
+      };
+
+      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+      return () => {
+        audioRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
+      };
+    }
+  }, [wordTimings, highlightedWordIndex]);
+
+  // Calculate word timings when script is generated
+  useEffect(() => {
+    if (finalScript) {
+      const words = finalScript.split(/\s+/);
+      const totalDuration = 180; // Assume 3 minutes
+      const timePerWord = totalDuration / words.length;
       
-      const totalDuration = 180; // 3분으로 가정
-      const timePerWord = totalDuration / allWords.length;
-      
-      const timings = allWords.map((word, index) => ({
+      const timings = words.map((word, index) => ({
         word,
         startTime: index * timePerWord,
         endTime: (index + 1) * timePerWord
@@ -261,33 +344,40 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
       
       setWordTimings(timings);
     }
-  }, [generatedScript]);
+  }, [finalScript]);
 
-  // 상태 로그 렌더링
+  // Render status log
   const renderStatusLog = () => {
-    // 항상 진행상황 메시지 표시
     return (
-      <div className="bg-white rounded-xl p-4 flex flex-col gap-2">
+      <div className="bg-white rounded-xl p-6 flex flex-col gap-3">
         {PROGRESS_MESSAGES.map((msg, idx) => {
-          // 현재 단계와 다음 단계만 표시
           if (idx > progressIndex + 1) return null;
-          
+          let textClass = '';
+          if (progressIndex > idx) {
+            textClass = 'font-semibold text-lg text-gray-500'; // Success
+          } else if (progressIndex === idx) {
+            textClass = 'font-bold text-xl text-yellow-700'; // Current
+          } else {
+            textClass = 'font-normal text-base text-gray-400'; // Next
+          }
           return (
-            <div key={msg} className="flex items-center gap-3">
+            <div key={msg} className="flex items-center gap-4">
               <span className={`w-4 h-4 rounded-full ${
-                progressIndex > idx ? 'bg-blue-500' : // 완료된 단계
-                progressIndex === idx ? 'bg-yellow-400 animate-pulse' : // 현재 단계
-                'bg-gray-200' // 다음 단계
+                progressIndex > idx ? 'bg-blue-500' : // Completed step
+                progressIndex === idx ? 'bg-yellow-400 animate-pulse' : // Current step
+                'bg-gray-200' // Next step
               } inline-block`}></span>
-              <span className="font-medium text-gray-500">{msg}</span>
+              <span className={textClass}>
+                {progressIndex > idx ? COMPLETED_MESSAGES[idx] : msg}
+              </span>
             </div>
           );
         })}
-        {/* 에러 메시지 표시 */}
+        {/* Display error messages */}
         {thinkingLogs.filter(log => log.type === 'error').length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <span className="w-4 h-4 rounded-full bg-red-500 inline-block"></span>
-            <span className="font-medium text-red-600">
+            <span className="font-bold text-lg text-red-600">
               {thinkingLogs.filter(log => log.type === 'error').map((log, i) => (
                 <span key={i}>Error: {log.message}</span>
               ))}
@@ -317,7 +407,7 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
     }
   };
 
-  // Thinking Progress 자동 접힘 로직
+  // Auto-collapse Thinking Progress logic
   useEffect(() => {
     if (thinkingLogs.length > 0) {
       if (visibleLogCount < Math.min(thinkingLogs.length, 5)) {
@@ -494,7 +584,25 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
         <div className="mt-8 p-6 bg-white rounded-2xl shadow-lg p-6 mb-8 relative">
           <h3 className="text-3xl font-extrabold mb-4 text-gray-900">Final Script</h3>
           <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-            <p className="text-lg text-gray-900 font-semibold whitespace-pre-wrap">{finalScript}</p>
+            <div className="space-y-2">
+              {visibleScriptLines.map((line, lineIndex) => (
+                <p key={lineIndex} className="text-lg text-gray-900 font-semibold whitespace-pre-wrap">
+                  {line.split(/(\s+)/).map((word, wordIndex) => {
+                    const isHighlighted = word === currentHighlightedWord;
+                    return (
+                      <span
+                        key={`${lineIndex}-${wordIndex}`}
+                        className={`transition-colors duration-200 ${
+                          isHighlighted ? 'bg-blue-100 rounded px-1' : ''
+                        }`}
+                      >
+                        {word}
+                      </span>
+                    );
+                  })}
+                </p>
+              ))}
+            </div>
           </div>
         </div>
       )}

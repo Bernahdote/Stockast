@@ -30,7 +30,7 @@ def get_keyfacts(ticker: str) -> str:
                 "blockAds": True,
             }
         },
-        "Andrei Maftei"  # Firecrawl account name in ACI
+        "lamas"  # Firecrawl account name in ACI
     )
     time.sleep(1)
 
@@ -68,7 +68,7 @@ def get_news_bullets(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "Andrei Maftei",
+            "lamas",
         )
 
         news_md = news_scrape["data"]["data"]["markdown"]
@@ -106,7 +106,7 @@ def get_news(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "Andrei Maftei",
+            "lamas",
         )
         time.sleep(1)
         news_md = news_scrape["data"]["data"]["markdown"]
@@ -144,7 +144,7 @@ def get_longer_news(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "Andrei Maftei"
+            "lamas"
         )
         main_news_data = main_news_page_scrape.data
 
@@ -217,7 +217,7 @@ def get_longer_news(ticker: str) -> str:
                         "blockAds": True,
                     }
                 },
-                "Andrei Maftei"
+                "lamas"
             )
             article_data = article_scrape_result.data
             if not article_data or "data" not in article_data or "markdown" not in article_data["data"]:
@@ -270,7 +270,7 @@ def get_sector_news(sector: str) -> str:
                     "blockAds": True,
                 }
             },
-            "Andrei Maftei",
+            "lamas",
         )
 
     news_md = news_scrape["data"]["data"]["markdown"]
@@ -303,7 +303,7 @@ def get_market_news(market: str) -> str:
                     "blockAds": True,
                 }
             },
-            "Andrei Maftei",
+            "lamas",
         )
 
     news_md = news_scrape["data"]["data"]["markdown"]
@@ -415,7 +415,8 @@ def generate_podcast(text: str) -> str:
                     "No more delimiters like [Outro] or [Intro]. "
                     "no Host:"
                     "no [Closing music] or ### Final Podcast Script" 
-                    "ONLY RETURN THE FINAL PODCAST SCRIPT READY TO BE READ OUTLOUD, NOTHING ELSE! "
+                    "In addition, create the thinking process of the podcast, and return it as a text via <think> and </think> tags."
+                    "create the final script of the podcast, and return it as a text starting with [Final Podcast Script] and ending with [End of Podcast Script]"
                 ),
             },
             {"role": "user", "content": text},

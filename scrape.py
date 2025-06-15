@@ -10,6 +10,7 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 import ast 
+from summarizer import get_or_generate_summary
 
 load_dotenv()                                 
 
@@ -253,6 +254,91 @@ def get_longer_news(ticker: str) -> str:
             rprint(Panel(f"Failed to process article {link_url}: {e}", style="bold red"))
         
     return summaries
+#(fix this one and summrizer.py) def get_longer_news(ticker: str) -> str:
+#     try:
+#         main_news_page_scrape = aci.functions.execute(
+#         "FIRECRAWL__SCRAPE",
+#         {
+#             "body": {
+#                 "url": f"https://finance.yahoo.com/quote/{ticker}/news",
+#                 "formats": ["markdown"],
+#                 "onlyMainContent": True,
+#                 "blockAds": True,
+#             }
+#         },
+#         "lamas"
+#     )
+
+    
+#         data_block = main_news_page_scrape.data
+#         if not data_block or "data" not in data_block or "markdown" not in data_block["data"]:
+#             raise ValueError("❌ markdown content not found in scrape response")
+
+#         main_news_md = data_block["data"]["markdown"]
+
+#     except Exception as e:
+#         rprint(Panel(f"Failed to scrape main news page: {e}", style="bold red"))
+#         return ""
+
+#     rprint(Panel("Extracting article links using Mistral", style="bold blue"))
+
+    
+#     try:
+#         links_resp = mistral.chat.complete(
+#             model="mistral-large-latest", 
+#             messages=[
+#                 {
+#                     "role": "system",
+#                     "content": (
+#                         f"You are given Markdown content from the Yahoo Finance news page for {ticker}. "
+#                         "Extract all unique URLs that appear to be links to individual news articles. "
+#                         "Convert relative URLs to absolute ones by prepending 'https://finance.yahoo.com'. "
+#                         "Return JSON: {'article_urls': ['https://...']}. Limit: 10 articles."
+#                     ),
+#                 },
+#                 {"role": "user", "content": main_news_md},
+#             ],
+#             response_format={"type": "json_object"}
+#         )
+
+#         extracted = json.loads(links_resp.choices[0].message.content)
+#         article_links = extracted.get("article_urls", [])
+#         article_links = [url for url in article_links if url.startswith("http")]
+
+#     except Exception as e:
+#         rprint(Panel(f"Failed to extract article links: {e}", style="bold red"))
+#         return ""
+
+    
+#     summaries = ""
+#     for url in article_links:
+#         try:
+#             scrape_result = aci.functions.execute(
+#                 "FIRECRAWL__SCRAPE",
+#                 {
+#                     "body": {
+#                         "url": url,
+#                         "formats": ["markdown"],
+#                         "onlyMainContent": True,
+#                         "blockAds": True,
+#                     }
+#                 },
+#                 "lamas"
+#             )
+#             article_md = scrape_result.data["data"]["markdown"]
+#             if not article_md:
+#                 continue
+
+#             # ✅ 벡터 DB 캐시 조회 or 생성
+#             summary = get_or_generate_summary(article_md, url=url, ticker=ticker)
+
+#             summaries += f"- [{summary}]({url})\n"
+#             rprint(Panel(f"✅ Summary added for {url}", style="green"))
+
+#         except Exception as e:
+#             rprint(Panel(f"Failed to process article {url}: {e}", style="bold red"))
+
+#     return summaries.strip()
 
 def get_sector_news(sector: str) -> str:
     
@@ -491,31 +577,13 @@ def get_technical_summary(ticker: str) -> str:
 
 if __name__ == "__main__": 
 
-    input = "I'm interested in Apple and health services and crypto"  
-    keys = understand_tickrs(input) 
-    sectors = understand_sectors(input) 
-    markets = understand_markets(input)
+    test_ticker = "AAPL"  # Apple 예시
 
-    print(keys) 
-    print(sectors)
-    print(markets)
+    from scrape import get_longer_news  # scrape.py에 정의되어 있다면
 
-    summary = "" 
+    print(f"🔍 Getting longer news for ticker: {test_ticker}")
+    summary = get_longer_news(test_ticker)
 
-    for key in keys:
-        summary += get_keyfacts(key) 
-        summary += get_technical_summary(key)
-        summary += get_news(key) 
-
-
-    sectors  = ast.literal_eval(sectors)   
-    markets  = ast.literal_eval(markets)  
-
-    for sec in sectors:
-        summary += get_sector_news(sec) 
-
-    for market in markets:
-        summary += get_market_news(market)
-
-    print(generate_podcast(summary))
+    print("\n📰 [Longer News Summary]")
+    print(summary)
 

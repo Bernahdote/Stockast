@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { podcastState } from '../store/atoms';
 import { ChevronDown, Play, Pause } from 'lucide-react';
+import { FaUserTie, FaUserNurse } from 'react-icons/fa';
 
 interface Voice {
   id: string;
@@ -11,6 +12,7 @@ interface Voice {
   gender: string;
   description: string;
   voice_id: string;
+  avatar: string;
 }
 
 interface TextAudioProcessorProps {
@@ -330,8 +332,12 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
               className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-xl hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  {voices.find(v => v.voice_id === selectedVoice)?.gender === 'Male' ? 'M' : 'F'}
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={voices.find(v => v.voice_id === selectedVoice)?.avatar}
+                    alt={voices.find(v => v.voice_id === selectedVoice)?.name}
+                    className="w-8 h-8 object-cover"
+                  />
                 </div>
                 <span className="font-medium text-gray-900">
                   {voices.find(v => v.voice_id === selectedVoice)?.name}
@@ -348,8 +354,12 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
                     onClick={() => handleVoiceSelect(voice.voice_id)}
                     className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-center gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      {voice.gender === 'Male' ? 'M' : 'F'}
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={voice.avatar}
+                        alt={voice.name}
+                        className="w-8 h-8 object-cover"
+                      />
                     </div>
                     <div>
                       <div className="font-semibold text-gray-900">{voice.name}</div>
@@ -419,7 +429,7 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
       {finalScript && (
         <div className="mt-8 p-6 bg-white rounded-2xl shadow-lg p-6 mb-8 relative">
           <h3 className="text-3xl font-extrabold mb-4 text-gray-900">Final Script</h3>
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
             <p className="text-lg text-gray-900 font-semibold whitespace-pre-wrap">{finalScript}</p>
           </div>
         </div>

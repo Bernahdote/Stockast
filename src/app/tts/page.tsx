@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useRecoilValue } from 'recoil';
 import { podcastState } from '../store/atoms';
 import TextAudioProcessor from '../components/TextAudioProcessor';
+import Link from 'next/link';
+import Header from '../components/Header';
 
 interface Voice {
   voice_id: string;
@@ -19,6 +21,7 @@ export default function TTSPage() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     if (!podcast.inputText) {
@@ -73,12 +76,12 @@ export default function TTSPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-[1200px] mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+    <main className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="max-w-[1200px] mx-auto px-4 py">
+        <h1 className="text-3xl font-bold text-gray-900">
           Generate Podcast
         </h1>
-
         <TextAudioProcessor voices={voices} />
       </div>
     </main>

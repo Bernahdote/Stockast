@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronUp, TrendingUp, MessageSquare, Mic, BarChart3, ChevronDown } from 'lucide-react';
+import { ChevronUp, TrendingUp, MessageSquare, Mic, BarChart3, ChevronDown, Type, Video, List, FilePenLine } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSetRecoilState } from 'recoil';
 import { podcastState } from './store/atoms';
+import { FaTwitter, FaLinkedin, FaYoutube, FaSpotify, FaPodcast } from 'react-icons/fa';
+import { SiThreads, SiTiktok, SiApplepodcasts } from 'react-icons/si';
+import Header from './components/Header';
 
 // Mock stock data for carousel display (icons, tickers, prices, change rates)
 const MOCK_TOP = [
@@ -36,6 +39,17 @@ interface Voice {
   name: string;
   gender: string;
   description: string;
+  avatar: string;
+}
+
+// Spinner 컴포넌트
+function Spinner() {
+  return (
+    <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+    </svg>
+  );
 }
 
 export default function Home() {
@@ -102,14 +116,35 @@ export default function Home() {
   }, [topLoopWidth, bottomLoopWidth]);
 
   const MODES = [
-    { id: 'text', label: 'Text' },
-    { id: 'video', label: 'Video' },
-    { id: 'voice', label: 'Voice' },
+    { id: 'text', label: 'Text', icon: Type },
+    { id: 'voice', label: 'Voice', icon: Mic },
+    { id: 'video', label: 'Video', icon: Video },
   ];
-  const [mode, setMode] = useState<'voice' | 'text'>('voice');
-
+  const [mode, setMode] = useState<'voice' | 'text' | 'video'>('voice');
   const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false);
+  const [isTextTypeDropdownOpen, setIsTextTypeDropdownOpen] = useState(false);
+  const [selectedTextType, setSelectedTextType] = useState('keynote');
 
+  const TEXT_TYPES = [
+    { 
+      id: 'keynote', 
+      label: 'Keynote', 
+      icon: List,
+      description: 'Professional presentation style content'
+    },
+    { 
+      id: 'dialogue', 
+      label: 'Dialogue', 
+      icon: MessageSquare,
+      description: 'Natural conversational style content'
+    },
+    { 
+      id: 'research', 
+      label: 'Research', 
+      icon: FilePenLine,
+      description: 'In-depth research and analysis focused content'
+    },
+  ];
 
   useEffect(() => {
     // voices API 호출
@@ -174,15 +209,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Updated Header */}
-      <header className="w-full px-6 py-4  mx-auto sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm transition-all duration-300">
-        <div className="flex justify-between items-center max-w-[1200px] mx-auto">
-        <div className="text-2xl font-bold text-blue-600">Stockast</div>
-        <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-          Get Started
-        </button>
-        </div>
-      </header>
+      <Header />
 
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Hero Section */}
@@ -210,7 +237,7 @@ export default function Home() {
 
             {/* Updated Search Input with Mode Buttons Inside */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <div className="w-full bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
+              <form onSubmit={handleSubmit} className="w-full bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
                 <input
                   type="text"
                   value={inputText}
@@ -224,10 +251,12 @@ export default function Home() {
                   {MODES.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setMode(m.id as 'voice' | 'text')}
-                      className={`px-4 py-1.5 rounded-full border font-semibold transition-colors text-sm
+                      type="button"
+                      onClick={() => setMode(m.id as 'voice' | 'text' | 'video')}
+                      className={`px-4 py-1.5 rounded-full border font-semibold transition-colors text-sm flex items-center gap-2
                         ${mode === m.id ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
                     >
+                      <m.icon className="w-4 h-4" />
                       {m.label}
                     </button>
                   ))}
@@ -235,22 +264,35 @@ export default function Home() {
                   {mode === 'voice' && (
                     <div className="relative">
                       <button
+                        type="button"
                         onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
                         className="flex items-center gap-2 px-4 py-1.5 rounded-full border font-semibold bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
                       >
-                        <span className="font-medium text-gray-900">
-                          {selectedVoice
-                            ? voices.find((v: Voice) => v.voice_id === selectedVoice)?.name || 'Select Voice'
-                            : 'Select Voice'}
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden">
+                          {(() => {
+                            const v = voices.find(v => v.voice_id === selectedVoice);
+                            if (!v) return null;
+                            return (
+                              <img
+                                src={v.avatar}
+                                alt={v.name}
+                                className="w-8 h-8 object-cover"
+                              />
+                            );
+                          })()}
+                        </div>
+                        <span className="font-medium text-gray-900 ml-2">
+                          {voices.find(v => v.voice_id === selectedVoice)?.name || 'Select Voice'}
                         </span>
                         <ChevronDown className="w-4 h-4" />
                       </button>
                       
                       {isVoiceDropdownOpen && (
-                        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 max-h-96 overflow-y-auto">
+                        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
                           {voices.map((voice) => (
                             <button
                               key={voice.voice_id}
+                              type="button"
                               onClick={() => {
                                 setSelectedVoice(voice.voice_id);
                                 setIsVoiceDropdownOpen(false);
@@ -258,15 +300,19 @@ export default function Home() {
                               className={`w-full flex items-center gap-4 px-6 py-4 text-left rounded-lg transition-all
                                 text-xl font-semibold
                                 border-2
-                                ${selectedVoice === voice.voice_id ? 'border-blue-600 bg-blue-50 font-bold text-blue-900 shadow-md' : 'border-transparent hover:border-blue-400 hover:bg-blue-50'}
+                                ${selectedVoice === voice.voice_id ? 'border-blue-600 bg-blue-50 font-bold text-blue-700 shadow-md' : 'border-transparent hover:border-blue-400 hover:bg-blue-50'}
                               `}
                               style={{ minHeight: '3.5rem' }}
                             >
-                              <div className={`w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold ${selectedVoice === voice.voice_id ? 'text-blue-900' : 'text-gray-800'}`}>
-                                {voice.gender === 'Male' ? 'M' : 'F'}
+                              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold overflow-hidden">
+                                <img
+                                  src={voice.avatar}
+                                  alt={voice.name}
+                                  className="w-12 h-12 object-cover"
+                                />
                               </div>
                               <div>
-                                <div className={`${selectedVoice === voice.voice_id ? 'font-bold text-blue-900' : 'font-semibold text-gray-800'} text-lg`}>{voice.name} <span className="text-base text-gray-500">({voice.gender})</span></div>
+                                <div className={`${selectedVoice === voice.voice_id ? 'font-bold text-blue-700' : 'font-semibold text-gray-800'} text-lg`}>{voice.name} <span className="text-base text-gray-500">({voice.gender})</span></div>
                                 <div className="text-base text-gray-500">{voice.description}</div>
                               </div>
                             </button>
@@ -276,26 +322,104 @@ export default function Home() {
                     </div>
                   )}
 
+                  {mode === 'text' && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsTextTypeDropdownOpen(!isTextTypeDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-1.5 rounded-full border font-semibold bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      >
+                        <span className="font-medium text-gray-900">
+                          {TEXT_TYPES.find(t => t.id === selectedTextType)?.label || 'Select Type'}
+                        </span>
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      
+                      {isTextTypeDropdownOpen && (
+                        <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-blue-200 z-50">
+                          {TEXT_TYPES.map((type) => (
+                            <button
+                              key={type.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedTextType(type.id);
+                                setIsTextTypeDropdownOpen(false);
+                              }}
+                              className={`w-full px-6 py-5 text-left hover:bg-blue-50 flex items-start gap-4 rounded-2xl transition-all
+                                 ${selectedTextType === type.id ? 'bg-blue-50 text-blue-700 font-bold border-2 border-blue-600 shadow-md' : 'text-gray-700 border-2 border-transparent'}`}
+                              style={{ fontSize: '1.15rem' }}
+                            >
+                              <div className={`w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-2xl
+                                ${selectedTextType === type.id ? 'text-blue-700' : 'text-gray-600'}`}>
+                                <type.icon className="w-7 h-7" />
+                              </div>
+                              <div>
+                                <div className={`font-semibold mb-1 ${selectedTextType === type.id ? 'text-blue-700' : 'text-gray-900'}`} style={{fontSize: '1.15rem'}}>
+                                  {type.label}
+                                </div>
+                                <div className="text-base text-gray-500" style={{fontSize: '1rem'}}>
+                                  {type.description}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
-                    onClick={handleSubmit}
+                    type="submit"
                     className="ml-auto px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all flex items-center justify-center"
                     style={{ minWidth: 56, minHeight: 56 }}
+                    disabled={isLoading}
                   >
-                    <ChevronUp className="w-6 h-6" />
+                    {isLoading ? <Spinner /> : <ChevronUp className="w-6 h-6" />}
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
 
-            <div className="flex justify-center items-center gap-8 text-base text-gray-500">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                No signup required
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Free to try
-              </div>
+            {/* 모드별 Usage 안내 (영문) */}
+            <div className="flex justify-center items-center gap-4 text-lg text-gray-700 mt-6">
+              {mode === 'text' && (
+                <div className="flex items-center gap-3">
+                  <List className="w-7 h-7 text-blue-500" />
+                  <span>
+                    AI analyzes market and stock data to generate various text content for
+                    <span className="inline-flex items-center gap-1 ml-2">
+                      <FaTwitter className="inline text-sky-400 w-5 h-5" /> Twitter,
+                      <FaLinkedin className="inline text-blue-700 w-5 h-5 ml-2" /> LinkedIn,
+                      <SiThreads className="inline text-black w-5 h-5 ml-2" /> Threads
+                    </span>.
+                  </span>
+                </div>
+              )}
+              {mode === 'voice' && (
+                <div className="flex items-center gap-3">
+                  <Mic className="w-7 h-7 text-blue-500" />
+                  <span>
+
+                    Choose an avatar and create a podcast audio with your topic instantly for
+                    <span className="inline-flex items-center gap-1 ml-2">
+                      <SiApplepodcasts className="inline text-purple-500 w-5 h-5" /> Apple Podcasts,
+                      <FaSpotify className="inline text-green-500 w-5 h-5 ml-2" /> Spotify,
+                      <FaPodcast className="inline text-yellow-500 w-5 h-5 ml-2" /> Google Podcasts
+                    </span>
+                  </span>
+                </div>
+              )}
+              {mode === 'video' && (
+                <div className="flex items-center gap-3">
+                  <Video className="w-7 h-7 text-blue-500" />
+                  <span>
+                    AI creates video scripts and content based on your input for
+                    <span className="inline-flex items-center gap-1 ml-2">
+                      <FaYoutube className="inline text-red-500 w-5 h-5" /> YouTube,
+                      <SiTiktok className="inline text-black w-5 h-5 ml-2" /> TikTok
+                    </span>.
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </section>

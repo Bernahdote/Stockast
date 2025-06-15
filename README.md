@@ -1,11 +1,9 @@
 
 # Stockast
-AI-application MVP project at Hackathon in Karlsruhe (KIT) hosted by {Tech: Europe}, supported by ACI.dev, ElevenLabs and Mistral. 
+MVP AI application developed during a Hackathon at Karlsruhe Institute of Technology (KIT), hosted by {Tech: Europe} and supported by ACI.dev, ElevenLabs, and Mistral.
 
 ### Our Goals
-We set out to build a platform that helps you stay on top of your investment portfolio. Using real-time news and statistics, our AI generates summaries and turns them into straight-forward podcasts you can listen to anywhere, anytime.
-
-Give it a try, and don’t forget to leave us your feedback!
+We built Stockast, a platform that helps you stay informed about your investment portfolio. Using real-time news and statistics, our AI generates concise summaries and converts them into straightforward, listen-anywhere podcasts. Give it a try, and don’t forget to leave us your feedback!
 
 
 ## Call TTS Test
@@ -18,9 +16,9 @@ This project demonstrates the integration of various AI services including text-
 
 ## Features
 
-- Text-to-Speech conversion using ElevenLabs API
-- Chat functionality using Mistral API
-- Chat history storage using Supabase
+* Generate AI-driven conversations using the Mistral API
+* Store and retrieve chat history via Supabase
+* Convert text to natural-sounding audio using ElevenLabs
 
 ## Prerequisites
 
@@ -118,24 +116,29 @@ src/
 - Save chat history to Supabase
 - View chat history
 
-### Backend (scrape.py) 
+## Backend Functionality (`scrape.py`)
 
+This script extracts financial insights and converts them into podcast-ready summaries.
 
+**Functions Overview:**
 
-* The functions understand_tickers(), understand_sectors() and understand_markets() all take a string as in input and analyzes which tickers, sectors and markets respectively that the user is interested in in an array []. 
-* The function get_keys() takes a string ticker input and returns a string of brief key analytics of the stock.
-* The function get_key_note() takes a string ticker input at returns a bullet points list of key news on the stock.
-* The function get_news() takes a string as a ticker and returns a string of brief news about this stock. 
-* The function get_market_news() and get_sector_news() takes a string as market/sector (as given from understand_sectors() or understand_markets()) and returns a string that describes important news of this market/sector.
-* The function get_technical_summer() takes a string ticker as in put and returns financial data with comparisons in time for this stock
-* The function generate_podcast() takes a string as input and rewrites it in a "podcast"- manner. It also tries to balance out imbalances between sections.
-  
-* See main method in scrape.py for example of usage with an example input. 
+- `understand_tickers(input: str) -> list`: Identifies stock tickers mentioned in the input.
+- `understand_sectors(input: str) -> list`: Identifies referenced sectors.
+- `understand_markets(input: str) -> list`: Identifies referenced markets.
+- `get_keys(ticker: str) -> str`: Returns key analytics for the specified stock.
+- `get_key_note(ticker: str) -> str`: Returns bullet-point key news for the given stock.
+- `get_news(ticker: str) -> str`: Summarizes news about the stock.
+- `get_market_news(market: str) -> str`: Summarizes news about a specific market.
+- `get_sector_news(sector: str) -> str`: Summarizes sector-specific news.
+- `get_technical_summer(ticker: str) -> str`: Provides time-based financial comparisons for a stock.
+- `generate_podcast(input: str) -> str`: Reformats the content into a coherent, podcast-style narrative.
+
+See the `main` method in `scrape.py` for an example of how these functions can be chained together.
 
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests.
+Contributions, issues, and feature suggestions are welcome! Feel free to open a pull request or submit feedback.
 
 ## License
 

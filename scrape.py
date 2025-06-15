@@ -10,6 +10,7 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 import ast 
+import time
 
 load_dotenv()                                 
 
@@ -19,7 +20,7 @@ mistral = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
 def get_keyfacts(ticker: str) -> str:
 
-    scrape_result = aci.functions.execute(
+    scrape_result = aci.handle_function_call(
         "FIRECRAWL__SCRAPE",
         {
             "body": {
@@ -29,11 +30,13 @@ def get_keyfacts(ticker: str) -> str:
                 "blockAds": True,
             }
         },
-        "lamas"  # Firecrawl account name in ACI
+        "Andrei Maftei"  # Firecrawl account name in ACI
     )
+    time.sleep(1)
+
     
 
-    markdown = scrape_result.data["data"]["markdown"]  # ← actual page text
+    markdown = scrape_result["data"]["data"]["markdown"]  # ← actual page text
     extract_resp = mistral.chat.complete(
         model="mistral-large-2411",
         messages=[
@@ -55,7 +58,7 @@ def get_keyfacts(ticker: str) -> str:
 
 def get_news_bullets(ticker: str) -> str:
     try:
-        news_scrape = aci.functions.execute(
+        news_scrape = aci.handle_function_call(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
@@ -65,11 +68,11 @@ def get_news_bullets(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "lamas",
+            "Andrei Maftei",
         )
 
-        news_md = news_scrape.data["data"]["markdown"]
-
+        news_md = news_scrape["data"]["data"]["markdown"]
+        time.sleep(1)
         news_resp = mistral.chat.complete(
             model="mistral-large-2411",
             messages=[
@@ -93,7 +96,7 @@ def get_news_bullets(ticker: str) -> str:
 
 def get_news(ticker: str) -> str:
 
-        news_scrape = aci.functions.execute(
+        news_scrape = aci.handle_function_call(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
@@ -103,10 +106,10 @@ def get_news(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "lamas",
+            "Andrei Maftei",
         )
-
-        news_md = news_scrape.data["data"]["markdown"]
+        time.sleep(1)
+        news_md = news_scrape["data"]["data"]["markdown"]
 
 
 
@@ -131,7 +134,7 @@ def get_longer_news(ticker: str) -> str:
 
 
     try:
-        main_news_page_scrape = aci.functions.execute(
+        main_news_page_scrape = aci.handle_function_call(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
@@ -141,12 +144,12 @@ def get_longer_news(ticker: str) -> str:
                     "blockAds": True,
                 }
             },
-            "lamas"
+            "Andrei Maftei"
         )
         main_news_data = main_news_page_scrape.data
 
         main_news_md = main_news_data["data"]["markdown"]
-        
+        time.sleep(1)
             
     except Exception as e:
         rprint(Panel(f"Failed to scrape main news page: {e}", style="bold red"))
@@ -204,7 +207,7 @@ def get_longer_news(ticker: str) -> str:
     for i, link_url in enumerate(article_links):
 
         try:
-            article_scrape_result = aci.functions.execute(
+            article_scrape_result = aci.handle_function_call(
                 "FIRECRAWL__SCRAPE",
                 {
                     "body": {
@@ -214,7 +217,7 @@ def get_longer_news(ticker: str) -> str:
                         "blockAds": True,
                     }
                 },
-                "lamas"
+                "Andrei Maftei"
             )
             article_data = article_scrape_result.data
             if not article_data or "data" not in article_data or "markdown" not in article_data["data"]:
@@ -257,7 +260,7 @@ def get_longer_news(ticker: str) -> str:
 def get_sector_news(sector: str) -> str:
     #print(f"Fetching news for sector: {sector}")
 
-    news_scrape = aci.functions.execute(
+    news_scrape = aci.handle_function_call(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
@@ -267,11 +270,11 @@ def get_sector_news(sector: str) -> str:
                     "blockAds": True,
                 }
             },
-            "lamas",
+            "Andrei Maftei",
         )
 
-    news_md = news_scrape.data["data"]["markdown"]
-
+    news_md = news_scrape["data"]["data"]["markdown"]
+    time.sleep(1)
     news_resp = mistral.chat.complete(
             model="mistral-large-2411",
             messages=[
@@ -290,7 +293,7 @@ def get_sector_news(sector: str) -> str:
     return news_resp.choices[0].message.content
 
 def get_market_news(market: str) -> str:
-    news_scrape = aci.functions.execute(
+    news_scrape = aci.handle_function_call(
             "FIRECRAWL__SCRAPE",
             {
                 "body": {
@@ -300,11 +303,11 @@ def get_market_news(market: str) -> str:
                     "blockAds": True,
                 }
             },
-            "lamas",
+            "Andrei Maftei",
         )
 
-    news_md = news_scrape.data["data"]["markdown"]
-
+    news_md = news_scrape["data"]["data"]["markdown"]
+    time.sleep(1)
     news_resp = mistral.chat.complete(
             model="mistral-large-2411",
             messages=[
@@ -318,7 +321,7 @@ def get_market_news(market: str) -> str:
                 {"role": "user", "content": news_md},
             ],
         )
-
+    time.sleep(1)
 
     return news_resp.choices[0].message.content
 
@@ -340,6 +343,7 @@ def understand_tickrs(text: str) -> list[str]:
             {"role": "user", "content": text},
         ],
     )
+    time.sleep(1)
     raw = resp.choices[0].message.content          
     tokens = [t.strip("[] ")                       
               for t in raw.split(",")             
@@ -494,16 +498,23 @@ if __name__ == "__main__":
     sectors = understand_sectors(input) 
     markets = understand_markets(input)
 
-    #print(keys) 
-    #print(sectors)
-    #print(markets)
+    print(keys) 
+    print(sectors)
+    print(markets)
 
     summary = "" 
 
     for key in keys:
         summary += get_keyfacts(key) 
+        print(f"ℹ️ Key facts for {key} retrieved.")
         summary += get_technical_summary(key)
+        time.sleep(1)
+
+        print(f"ℹ️ Technical summary for {key} retrieved.")
         summary += get_news(key) 
+        time.sleep(1)
+
+        print(f"ℹ️ News for {key} retrieved.")
 
 
     sectors  = ast.literal_eval(sectors)   
@@ -511,9 +522,13 @@ if __name__ == "__main__":
 
     for sec in sectors:
         summary += get_sector_news(sec) 
+        time.sleep(1)
+
     
     for market in markets:
         summary += get_market_news(market)
+        time.sleep(1)
+
 
     print(summary)
 

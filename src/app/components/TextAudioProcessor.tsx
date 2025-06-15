@@ -24,7 +24,9 @@ const PROGRESS_MESSAGES = [
   "Analyzing market trends...",
   "Gathering financial data...",
   "Generating comprehensive analysis...",
-  "Structuring podcast content..."
+  "Structuring podcast content...",
+  "Script Generation Completed",
+  "Audio Generation Completed"
 ];
 
 // 파싱 함수 추가
@@ -128,6 +130,7 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
               setThinkingLogs(filteredLog.map(line => ({ message: line, type: 'log' })));
               setFinalScript(script);
               setGeneratedScript(script.split('\n').filter(line => line.trim()));
+              setProgressIndex(5); // Script Generation Completed 표시
               generateAudio(script);
               eventSource.close();
               setIsGeneratingScript(false);
@@ -141,11 +144,13 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
 
           eventSource.onerror = (error) => {
             console.error('EventSource error:', error);
+            setThinkingLogs(prev => [...prev, { message: 'Failed to generate script. Please try again.', type: 'error' }]);
             eventSource.close();
             setIsGeneratingScript(false);
           };
         } catch (error) {
           console.error('Error:', error);
+          setThinkingLogs(prev => [...prev, { message: 'Failed to generate script. Please try again.', type: 'error' }]);
           setIsGeneratingScript(false);
         }
       };
@@ -172,9 +177,11 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
           const audioUrl = URL.createObjectURL(blob);
           setAudioUrl(audioUrl);
           setIsGeneratingAudio(false);
+          setProgressIndex(6); // Audio Generation Completed 표시
         } catch (error) {
           console.error('Error generating audio:', error);
           setIsGeneratingAudio(false);
+          setThinkingLogs(prev => [...prev, { message: 'Failed to generate audio. Please try again.', type: 'error' }]);
         }
       };
 
@@ -261,12 +268,21 @@ export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) 
     // 항상 진행상황 메시지 표시
     return (
       <div className="bg-white rounded-xl p-4 flex flex-col gap-2">
-        {PROGRESS_MESSAGES.map((msg, idx) => (
-          <div key={msg} className="flex items-center gap-3">
-            <span className={`w-4 h-4 rounded-full ${progressIndex > idx + 1 ? 'bg-blue-500' : progressIndex === idx + 1 ? 'bg-yellow-400 animate-pulse' : 'bg-gray-200'} inline-block`}></span>
-            <span className="font-medium text-gray-900">{msg}</span>
-          </div>
-        ))}
+        {PROGRESS_MESSAGES.map((msg, idx) => {
+          // 현재 단계와 다음 단계만 표시
+          if (idx > progressIndex + 1) return null;
+          
+          return (
+            <div key={msg} className="flex items-center gap-3">
+              <span className={`w-4 h-4 rounded-full ${
+                progressIndex > idx ? 'bg-blue-500' : // 완료된 단계
+                progressIndex === idx ? 'bg-yellow-400 animate-pulse' : // 현재 단계
+                'bg-gray-200' // 다음 단계
+              } inline-block`}></span>
+              <span className="font-medium text-gray-500">{msg}</span>
+            </div>
+          );
+        })}
         {/* 에러 메시지 표시 */}
         {thinkingLogs.filter(log => log.type === 'error').length > 0 && (
           <div className="flex items-center gap-3">

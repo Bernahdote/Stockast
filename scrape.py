@@ -255,8 +255,7 @@ def get_longer_news(ticker: str) -> str:
     return summaries
 
 def get_sector_news(sector: str) -> str:
-    
-    print(f"Fetching news for sector: {sector}")
+    #print(f"Fetching news for sector: {sector}")
 
     news_scrape = aci.functions.execute(
             "FIRECRAWL__SCRAPE",
@@ -399,8 +398,9 @@ def generate_podcast(text: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are given a text that summarizes the latest news about specific stocks, markets and sectors. "
+                    "You are given a content text that summarizes the latest news about specific stocks, markets and sectors. "
                     "Generate a podcast script based on this text, making it engaging and suitable for audio format. "
+                    "DO NOT USE ANY THINKING OR REASONING IN THE ANSWER, JUST GENERATE THE PODCAST SCRIPT. "
                     "Start with a catchy introduction"
                     "Keep the information of the stock, sector and market similar in length, so that the podcast is balanced. "
                     "Do absolutely not make the text longer than 8000 charachters!"
@@ -411,6 +411,7 @@ def generate_podcast(text: str) -> str:
                     "No more delimiters like [Outro] or [Intro]. "
                     "no Host:"
                     "no [Closing music] or ### Final Podcast Script" 
+                    "ONLY RETURN THE FINAL PODCAST SCRIPT READY TO BE READ OUTLOUD, NOTHING ELSE! "
                 ),
             },
             {"role": "user", "content": text},
@@ -423,10 +424,7 @@ def get_technical_summary(ticker: str) -> str:
     """Get technical analysis summary for a given ticker."""
     try:
         # Download historical data
-        data = yf.download(ticker, period="3mo", interval="1d")
-        
-        if data.empty:
-            return f"Could not download data for ticker: {ticker}"
+        data = yf.download(ticker, period="3mo", interval="1d", auto_adjust= False, progress=False)
 
         # Flatten MultiIndex columns if they exist
         if isinstance(data.columns, pd.MultiIndex):
@@ -496,9 +494,9 @@ if __name__ == "__main__":
     sectors = understand_sectors(input) 
     markets = understand_markets(input)
 
-    print(keys) 
-    print(sectors)
-    print(markets)
+    #print(keys) 
+    #print(sectors)
+    #print(markets)
 
     summary = "" 
 
@@ -514,8 +512,11 @@ if __name__ == "__main__":
     for sec in sectors:
         summary += get_sector_news(sec) 
 
+
     for market in markets:
         summary += get_market_news(market)
+
+
 
     print(generate_podcast(summary))
 

@@ -478,8 +478,8 @@ def get_technical_summary(ticker: str) -> str:
 
         # Format output
         date_str = latest.name.date() if hasattr(latest.name, 'date') else "latest"
-        output = f"\n📊 Technical Summary for {ticker} ({date_str}):\n"
-        output += f"Closing Price: ${latest['Close']:.2f}\n"
+        output = f"Technical Summary for {ticker} ({date_str}):\n"
+        output += f"\n Closing Price: ${latest['Close']:.2f}\n"
         output += "\n".join(f"- {line}" for line in summary_lines)
         
         return output
@@ -489,7 +489,7 @@ def get_technical_summary(ticker: str) -> str:
 
 if __name__ == "__main__": 
 
-    input = "I'm interested in Apple and health services and crypto"  
+    input = "I'm interested in tesla, crypto and currencies. Can you hold a less formal tone?"  
     keys = understand_tickrs(input) 
     sectors = understand_sectors(input) 
     markets = understand_markets(input)
@@ -511,12 +511,11 @@ if __name__ == "__main__":
 
     for sec in sectors:
         summary += get_sector_news(sec) 
-
-
+    
     for market in markets:
         summary += get_market_news(market)
 
+    print(summary)
 
-
-    print(generate_podcast(summary))
+    #print(generate_podcast(summary))
 

@@ -1,145 +1,492 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { podcastState } from '../store/atoms';
+import { ChevronDown, Play, Pause } from 'lucide-react';
 
 interface Voice {
-  voice_id: string;
+  id: string;
   name: string;
   gender: string;
   description: string;
+  voice_id: string;
 }
 
-interface Props {
+interface TextAudioProcessorProps {
   voices: Voice[];
 }
 
-const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+// progressMessages를 컴포넌트 바깥에 선언
+const PROGRESS_MESSAGES = [
+  "Analyzing market trends...",
+  "Gathering financial data...",
+  "Generating comprehensive analysis...",
+  "Structuring podcast content..."
+];
 
-export default function TextAudioProcessor({ voices }: Props) {
-  const [text, setText] = useState('');
+// 파싱 함수 추가
+function parsePodcastContent(content: string) {
+  // 1. 상태 로그 추출
+  let log = '';
+  const thinkMatch = content.match(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/i);
+  if (thinkMatch) {
+    log = thinkMatch[0]
+      .replace(/<think(?:ing)?>/i, '')
+      .replace(/<\/think(?:ing)?>/i, '')
+      .trim();
+  }
+
+  // 2. 최종 스크립트 추출
+  let script = '';
+  const scriptMatch = content.match(/\[Final Podcast Script\]([\s\S]*)$/i);
+  if (scriptMatch) {
+    script = scriptMatch[1].trim();
+  }
+
+  console.log("log after parsing", log);
+  console.log("script after parsing", script);
+  return { log, script };
+}
+
+export default function TextAudioProcessor({ voices }: TextAudioProcessorProps) {
+  const podcast = useRecoilValue(podcastState);
+  const setPodcast = useSetRecoilState(podcastState);
+  const [selectedVoiceState, setSelectedVoiceState] = useState<string>(voices[0]?.voice_id || '');
+  const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [generatedScript, setGeneratedScript] = useState<string[]>([]);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [processingLogs, setProcessingLogs] = useState<string[]>([]);
+  const [thinkingLogs, setThinkingLogs] = useState<{ message: string, type: 'log' | 'error' }[]>([]);
+  const [finalScript, setFinalScript] = useState<string>('');
+  const [progressIndex, setProgressIndex] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const hasRun = useRef(false);
+  const [wordTimings, setWordTimings] = useState<Array<{word: string, startTime: number, endTime: number}>>([]);
+  const [visibleLogs, setVisibleLogs] = useState<string[]>([]);
+  const [audioFailed, setAudioFailed] = useState(false);
+  const [scriptFailed, setScriptFailed] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState<string>(voices[0]?.voice_id || '');
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [showAllLogs, setShowAllLogs] = useState(false);
+  const [visibleLogCount, setVisibleLogCount] = useState(4);
 
+  // selectedVoice를 voice_id로 관리
+  const selectedVoice = podcast.selectedVoice || selectedVoiceState;
+
+  // 로그를 순차적으로 표시하는 함수
+  const showLogsSequentially = (logs: string[]) => {
+    setVisibleLogs([]);
+    logs.forEach((log, index) => {
+      setTimeout(() => {
+        setVisibleLogs(prev => [...prev, log]);
+      }, index * 1500); // 1.5초 간격으로 로그 표시
+    });
+  };
+
+  // 스크립트 생성 및 상태 로그
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackSpeed;
-    }
-  }, [playbackSpeed]);
+    if (podcast.inputText && !hasRun.current) {
+      hasRun.current = true;
+      const handleGenerateScript = async () => {
+        if (!podcast.inputText.trim()) {
+          alert('Please enter some text');
+          return;
+        }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim() || isLoading || !selectedVoice) return;
+        setIsGeneratingScript(true);
+        setGeneratedScript([]);
+        setProcessingLogs([]);
+        setFinalScript('');
+        setProgressIndex(0);
 
-    setIsLoading(true);
-    setError(null);
-    setAudioUrl(null);
-
-    try {
-      const response = await fetch('/api/process-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text, voice_id: selectedVoice }),
-      });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to process text';
         try {
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch {}
-        throw new Error(errorMsg);
-      }
+          const eventSource = new EventSource(`/api/generate-podcast-text?text=${encodeURIComponent(podcast.inputText)}`);
+          
+          eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'log') {
+              setProcessingLogs(prev => [...prev, data.message]);
+              if (!PROGRESS_MESSAGES.includes(data.message)) {
+                setThinkingLogs(prev => [...prev, { message: data.message, type: 'log' }]);
+              }
+              setProgressIndex(prev => prev + 1);
+            } else if (data.type === 'script') {
+              const { log, script } = parsePodcastContent(data.content);
+              const filteredLog = log.split('\n').filter(line => line.trim() && !PROGRESS_MESSAGES.includes(line.trim()));
+              setThinkingLogs(filteredLog.map(line => ({ message: line, type: 'log' })));
+              setFinalScript(script);
+              setGeneratedScript(script.split('\n').filter(line => line.trim()));
+              generateAudio(script);
+              eventSource.close();
+              setIsGeneratingScript(false);
+            } else if (data.type === 'error') {
+              console.error('Error:', data.message);
+              setThinkingLogs(prev => [...prev, { message: data.message, type: 'error' }]);
+              eventSource.close();
+              setIsGeneratingScript(false);
+            }
+          };
 
-      // 오디오 blob으로 받기
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to process text');
-    } finally {
-      setIsLoading(false);
+          eventSource.onerror = (error) => {
+            console.error('EventSource error:', error);
+            eventSource.close();
+            setIsGeneratingScript(false);
+          };
+        } catch (error) {
+          console.error('Error:', error);
+          setIsGeneratingScript(false);
+        }
+      };
+
+      const generateAudio = async (script: string) => {
+        setIsGeneratingAudio(true);
+        try {
+          const response = await fetch('/api/generate-audio', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: script,
+              voice_id: selectedVoiceState,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to generate audio');
+          }
+
+          const blob = await response.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          setAudioUrl(audioUrl);
+          setIsGeneratingAudio(false);
+        } catch (error) {
+          console.error('Error generating audio:', error);
+          setIsGeneratingAudio(false);
+        }
+      };
+
+      handleGenerateScript();
+    }
+  }, [podcast.inputText, selectedVoiceState]);
+
+  const playbackRates = [1, 1.5, 2];
+
+  const handleVoiceSelect = (voiceId: string) => {
+    setSelectedVoiceState(voiceId);
+    setIsVoiceDropdownOpen(false);
+    setPodcast(prev => ({
+      ...prev,
+      selectedVoice: voiceId
+    }));
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
     }
   };
 
-  return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="text" className="block text-sm font-medium text-gray-800 mb-2">
-            Enter Text
-          </label>
-          <textarea
-            id="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
-            rows={4}
-            placeholder="Type or paste your text here..."
-            disabled={isLoading}
-          />
-        </div>
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
 
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-2">
-            Select Voice
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            {voices.map((voice) => (
-              <button
-                key={voice.voice_id}
-                type="button"
-                onClick={() => setSelectedVoice(voice.voice_id)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  selectedVoice === voice.voice_id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-900">{voice.name}</span>
-                  <span className={`text-sm px-2 py-1 rounded-full ${
-                    voice.gender === 'Female' 
-                      ? 'bg-pink-100 text-pink-800' 
-                      : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {voice.gender}
-                  </span>
+  const handlePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handlePlaybackRateChange = (rate: number) => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+      setPlaybackRate(rate);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // 스크립트가 생성되면 단어 타이밍 계산
+  useEffect(() => {
+    if (generatedScript.length > 0) {
+      // 각 줄을 단어로 분리하고 띄어쓰기 유지
+      const allWords = generatedScript.flatMap(line => line.split(/(\s+)/));
+      
+      const totalDuration = 180; // 3분으로 가정
+      const timePerWord = totalDuration / allWords.length;
+      
+      const timings = allWords.map((word, index) => ({
+        word,
+        startTime: index * timePerWord,
+        endTime: (index + 1) * timePerWord
+      }));
+      
+      setWordTimings(timings);
+    }
+  }, [generatedScript]);
+
+  // 상태 로그 렌더링
+  const renderStatusLog = () => {
+    // 항상 진행상황 메시지 표시
+    return (
+      <div className="bg-white rounded-xl p-4 flex flex-col gap-2">
+        {PROGRESS_MESSAGES.map((msg, idx) => (
+          <div key={msg} className="flex items-center gap-3">
+            <span className={`w-4 h-4 rounded-full ${progressIndex > idx + 1 ? 'bg-blue-500' : progressIndex === idx + 1 ? 'bg-yellow-400 animate-pulse' : 'bg-gray-200'} inline-block`}></span>
+            <span className="font-medium text-gray-900">{msg}</span>
+          </div>
+        ))}
+        {/* 에러 메시지 표시 */}
+        {thinkingLogs.filter(log => log.type === 'error').length > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="w-4 h-4 rounded-full bg-red-500 inline-block"></span>
+            <span className="font-medium text-red-600">
+              {thinkingLogs.filter(log => log.type === 'error').map((log, i) => (
+                <span key={i}>Error: {log.message}</span>
+              ))}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 오디오 URL이 바뀔 때마다 <audio>를 새로 로드
+  useEffect(() => {
+    if (audioRef.current && audioUrl) {
+      console.log('Loading new audio URL:', audioUrl);
+      audioRef.current.load();
+    }
+  }, [audioUrl]);
+
+  const handleDownload = () => {
+    if (audioUrl) {
+      const link = document.createElement('a');
+      link.href = audioUrl;
+      link.download = 'podcast.mp3';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Thinking Progress 자동 접힘 로직
+  useEffect(() => {
+    if (thinkingLogs.length > 0) {
+      if (visibleLogCount < Math.min(thinkingLogs.length, 5)) {
+        const timer = setTimeout(() => {
+          setVisibleLogCount((prev) => Math.min(prev + 4, Math.min(thinkingLogs.length, 5)));
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+      if (thinkingLogs.length >= 5 && visibleLogCount >= 5) {
+        setShowAllLogs(false);
+      }
+    }
+  }, [thinkingLogs, visibleLogCount]);
+
+  return (
+    <div className="max-w-[1200px] mx-auto py-8">
+      {/* 상단 Your Input + Voice 드롭다운 */}
+      <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 flex items-center gap-8">
+        <div className="flex-1">
+          <label className="block text-lg font-bold text-gray-900 mb-2">Your Input</label>
+          <div className="bg-gray-50 rounded-xl p-4 text-gray-600 text-lg">
+            {podcast.inputText}
+          </div>
+        </div>
+        <div className="w-64">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Voice</label>
+          <div className="relative">
+            <button
+              onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
+              className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-xl hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  {voices.find(v => v.voice_id === selectedVoice)?.gender === 'Male' ? 'M' : 'F'}
                 </div>
-                <p className="text-sm text-gray-600">{voice.description}</p>
-              </button>
+                <span className="font-medium text-gray-900">
+                  {voices.find(v => v.voice_id === selectedVoice)?.name}
+                </span>
+              </div>
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            </button>
+            
+            {isVoiceDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                {voices.map((voice) => (
+                  <button
+                    key={voice.voice_id}
+                    onClick={() => handleVoiceSelect(voice.voice_id)}
+                    className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                      {voice.gender === 'Male' ? 'M' : 'F'}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">{voice.name}</div>
+                      <div className="text-sm text-gray-500">{voice.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 상태 로그 */}
+      <div className="mb-4">
+        {renderStatusLog()}
+      </div>
+
+      {/* 처리 로그 영역 */}
+      {visibleLogs.length > 0 && (
+        <div className="bg-gray-50 rounded-xl p-6 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Processing Logs</h3>
+          <div className="space-y-2">
+            {visibleLogs.map((log, index) => (
+              <div key={index} className="text-gray-600">
+                {log}
+              </div>
             ))}
           </div>
         </div>
+      )}
 
-        <button
-          type="submit"
-          disabled={isLoading || !selectedVoice}
-          className={`w-full py-3 px-4 rounded-lg text-white font-medium text-lg ${
-            isLoading || !selectedVoice
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          {isLoading ? 'Converting...' : 'Convert to Speech'}
-        </button>
-      </form>
-
-      {error && (
-        <div className="p-3 bg-red-100 text-red-800 rounded-lg font-medium mt-4">
-          {error}
+      {/* Thinking Process (Thinking Logs) */}
+      {thinkingLogs.length > 0 && (
+        <div className="mt-4 p-4 bg-white rounded-2xl shadow-lg p-6 mb-8 relative">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold mb-2 text-gray-900">Thinking Process</h3>
+            {((finalScript || thinkingLogs.length > 5) && (
+              <button
+                className="ml-2 transition-transform duration-200"
+                onClick={() => setShowAllLogs((prev) => !prev)}
+                aria-label={showAllLogs ? '접기' : '펼치기'}
+                style={{ transform: showAllLogs ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              >
+                <ChevronDown size={20} color="#2563eb" />
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {(showAllLogs ? thinkingLogs : thinkingLogs.slice(0, visibleLogCount)).map((log, idx) => (
+              <div key={idx} className="flex items-center space-x-2">
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-base ${log.type === 'error' ? 'text-red-600' : 'text-blue-600'}`} style={{ background: log.type === 'error' ? '#ffe0e0' : '#e0edff' }}>
+                  {idx + 1}
+                </div>
+                <div className="flex-1">
+                  <div className={`p-2 rounded-lg shadow-sm ${log.type === 'error' ? 'bg-red-50' : 'bg-gray-50'}` }>
+                    <p className={`text-base font-medium line-clamp-2 ${log.type === 'error' ? 'text-red-700' : 'text-gray-800'}`}>{log.message}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {audioUrl && (
-        <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-          <h2 className="text-lg font-medium mb-4 text-gray-800">Generated Audio</h2>
-          <audio ref={audioRef} controls src={audioUrl} className="w-full" />
+      {/* Final Script */}
+      {finalScript && (
+        <div className="mt-8 p-6 bg-white rounded-2xl shadow-lg p-6 mb-8 relative">
+          <h3 className="text-3xl font-extrabold mb-4 text-gray-900">Final Script</h3>
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <p className="text-lg text-gray-900 font-semibold whitespace-pre-wrap">{finalScript}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 오디오 플레이어 */}
+      {!isGeneratingScript && !isGeneratingAudio && audioUrl && (
+        <div className="bg-gray-50 rounded-xl p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={handlePlayPause}
+              className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 text-2xl"
+            >
+              {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7" />}
+            </button>
+            <div className="flex-1">
+              <input
+                type="range"
+                min={0}
+                max={duration}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full accent-blue-600"
+              />
+              <div className="flex justify-between text-sm text-gray-500 mt-1">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 items-center">
+              {playbackRates.map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => {
+                    if (audioRef.current) {
+                      audioRef.current.playbackRate = rate;
+                      setPlaybackRate(rate);
+                    }
+                  }}
+                  className={`px-3 py-1 rounded font-semibold border transition-all ${playbackRate === rate ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
+                >
+                  {rate}x
+                </button>
+              ))}
+              <button
+                onClick={handleDownload}
+                className="px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2 border border-blue-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => {
+              setIsPlaying(false);
+            }}
+            onError={(e) => console.error('Audio error:', e)}
+          />
         </div>
       )}
     </div>

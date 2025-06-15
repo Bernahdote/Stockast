@@ -8,6 +8,7 @@ from rich import print as rprint
 from rich.panel import Panel
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import pandas_ta as ta
 import ast 
 
@@ -410,8 +411,9 @@ def generate_podcast(text: str) -> str:
                     "Only return the final podcast script."
                     "No more delimiters like [Outro] or [Intro]. "
                     "no Host:"
-                    "no [Closing music] or ### Final Podcast Script" 
-                    "ONLY RETURN THE FINAL PODCAST SCRIPT READY TO BE READ OUTLOUD, NOTHING ELSE! "
+                    "no [Closing music] or ### Final Podcast Script"
+                    "return the thinking process in <thinking> and </thinking>"
+                    "return the final podcast script after [Final Podcast Script]"
                 ),
             },
             {"role": "user", "content": text},
@@ -420,22 +422,11 @@ def generate_podcast(text: str) -> str:
     return podcast_resp.choices[0].message.content
 
 def get_technical_summary(ticker: str) -> str:
-
-    """Get technical analysis summary for a given ticker."""
     try:
         # Download historical data
-        data = yf.download(ticker, period="3mo", interval="1d", auto_adjust= False, progress=False)
-
-        # Flatten MultiIndex columns if they exist
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = [col[0] for col in data.columns]
-
-        # Drop missing values and check if sufficient data exists
-        data = data.dropna(subset=["Close"])
-        
-        MIN_PERIODS = 26  # Minimum periods needed for all indicators
-        if len(data) < MIN_PERIODS:
-            return f"Insufficient data for {ticker}. Need at least {MIN_PERIODS} data points, got {len(data)}."
+        data = yf.download(ticker, period="3mo", interval="1d")
+        if data.empty:
+            return f"Could not download data for ticker: {ticker}"
 
         # Calculate technical indicators
         data["RSI"] = ta.rsi(data["Close"])
@@ -443,35 +434,30 @@ def get_technical_summary(ticker: str) -> str:
         
         macd = ta.macd(data["Close"])
         if macd is not None and not macd.empty:
-            required_cols = ['MACD_12_26_9', 'MACDh_12_26_9', 'MACDs_12_26_9']
-            if all(col in macd.columns for col in required_cols):
-                data = pd.concat([data, macd[required_cols]], axis=1)
-            else:
-                return f"MACD calculation failed for {ticker}: missing columns."
-        else:
-            return f"MACD calculation failed for {ticker}."
+            data = pd.concat([data, macd], axis=1)
 
-        # Generate summary
+        # Get latest values
         latest = data.iloc[-1]
+        
+        # Generate summary
         summary_lines = []
-
-        # Analyze price vs SMA20
+        
+        # Price analysis
         if pd.notna(latest.get("SMA20")):
             trend = "above" if latest["Close"] > latest["SMA20"] else "below"
-            strength = "strength" if trend == "above" else "weakness"
-            summary_lines.append(f"Trading {trend} 20-day average, indicating short-term {strength}.")
-
-        # Analyze RSI
+            summary_lines.append(f"Current price is {trend} the 20-day moving average.")
+        
+        # RSI analysis
         if pd.notna(latest.get("RSI")):
-            rsi_val = latest["RSI"]
-            if rsi_val > 70:
-                summary_lines.append("RSI above 70 suggests the stock may be overbought.")
-            elif rsi_val < 30:
-                summary_lines.append("RSI below 30 indicates the stock might be oversold.")
+            rsi = latest["RSI"]
+            if rsi > 70:
+                summary_lines.append("RSI indicates overbought conditions.")
+            elif rsi < 30:
+                summary_lines.append("RSI indicates oversold conditions.")
             else:
-                summary_lines.append("RSI in neutral range, showing balanced momentum.")
-
-        # Analyze MACD
+                summary_lines.append(f"RSI at {rsi:.1f} indicates neutral conditions.")
+        
+        # MACD analysis
         if pd.notna(latest.get("MACD_12_26_9")):
             momentum = "bullish" if latest["MACD_12_26_9"] > 0 else "bearish"
             summary_lines.append(f"MACD indicates {momentum} momentum.")

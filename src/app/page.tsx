@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronUp, TrendingUp, MessageSquare, Mic, BarChart3 } from 'lucide-react';
+import { ChevronUp, TrendingUp, MessageSquare, Mic, BarChart3, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useSetRecoilState } from 'recoil';
+import { podcastState } from './store/atoms';
 
 // Mock stock data for carousel display (icons, tickers, prices, change rates)
 const MOCK_TOP = [
@@ -27,10 +30,25 @@ const EXAMPLE_QUESTIONS = [
   "Fed rate impact"
 ];
 
+// Voice 타입 정의
+interface Voice {
+  voice_id: string;
+  name: string;
+  gender: string;
+  description: string;
+}
+
 export default function Home() {
+  const router = useRouter();
+  const setPodcast = useSetRecoilState(podcastState);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
+
   const [offsetTop, setOffsetTop] = useState(0);
   const [offsetBottom, setOffsetBottom] = useState(0);
-  const [demoInput, setDemoInput] = useState('');
 
   // Infinite rolling carousel - triple the arrays for seamless loop
   const topList = [...MOCK_TOP, ...MOCK_TOP, ...MOCK_TOP];
@@ -88,16 +106,82 @@ export default function Home() {
     { id: 'video', label: 'Video' },
     { id: 'voice', label: 'Voice' },
   ];
-  const [mode, setMode] = useState('text');
+  const [mode, setMode] = useState<'voice' | 'text'>('voice');
+
+  const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false);
+
+
+  useEffect(() => {
+    // voices API 호출
+    const fetchVoices = async () => {
+      try {
+        const res = await fetch('/api/voices');
+        const data = await res.json();
+        setVoices(data);
+        if (data.length > 0) setSelectedVoice(data[0].voice_id);
+      } catch {}
+    };
+    fetchVoices();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (mode === 'text') {
+        const response = await fetch('/api/process-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: inputText }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to process text');
+        }
+
+        setPodcast(prev => ({
+          ...prev,
+          inputText,
+          selectedVoice
+        }));
+        router.push('/thread');
+      } else {
+        setPodcast(prev => ({
+          ...prev,
+          inputText,
+          selectedVoice
+        }));
+        router.push('/tts');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getInputPlaceholder = () => {
+    return mode === 'voice' 
+      ? 'Enter text to convert to podcast...' 
+      : 'Enter stock tickers (e.g., AAPL, MSFT, GOOGL)';
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Updated Header */}
-      <header className="w-full px-6 py-4 flex justify-between items-center max-w-[1200px] mx-auto sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm transition-all duration-300">
+      <header className="w-full px-6 py-4  mx-auto sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm transition-all duration-300">
+        <div className="flex justify-between items-center max-w-[1200px] mx-auto">
         <div className="text-2xl font-bold text-blue-600">Stockast</div>
         <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
           Get Started
         </button>
+        </div>
       </header>
 
       <div className="max-w-[1200px] mx-auto px-6">
@@ -116,7 +200,7 @@ export default function Home() {
               {EXAMPLE_QUESTIONS.map((ex, i) => (
                 <button
                   key={i}
-                  onClick={() => setDemoInput(ex)}
+                  onClick={() => setInputText(ex)}
                   className="px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200 hover:bg-blue-100 transition-colors text-base shadow-sm"
                 >
                   {ex}
@@ -129,25 +213,71 @@ export default function Home() {
               <div className="w-full bg-white rounded-2xl border-2 border-blue-400 shadow-lg p-6">
                 <input
                   type="text"
-                  value={demoInput}
-                  onChange={e => setDemoInput(e.target.value)}
-                  placeholder="e.g. Tesla Q2 forecast, Best AI stocks 2024, Fed interest rate news"
+                  value={inputText}
+                  onChange={e => setInputText(e.target.value)}
+                  placeholder={getInputPlaceholder()}
                   className="w-full px-4 py-4 rounded-xl border-none focus:ring-2 focus:ring-blue-500 text-xl font-bold text-blue-900 bg-transparent placeholder-blue-400 placeholder:font-bold placeholder:text-lg"
                   style={{ letterSpacing: '0.01em' }}
-                  disabled={mode !== 'text'}
                 />
+
                 <div className="flex items-center gap-3 mt-4">
                   {MODES.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setMode(m.id)}
+                      onClick={() => setMode(m.id as 'voice' | 'text')}
                       className={`px-4 py-1.5 rounded-full border font-semibold transition-colors text-sm
                         ${mode === m.id ? 'bg-blue-600 text-white border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
                     >
                       {m.label}
                     </button>
                   ))}
+                  
+                  {mode === 'voice' && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-1.5 rounded-full border font-semibold bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      >
+                        <span className="font-medium text-gray-900">
+                          {selectedVoice
+                            ? voices.find((v: Voice) => v.voice_id === selectedVoice)?.name || 'Select Voice'
+                            : 'Select Voice'}
+                        </span>
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      
+                      {isVoiceDropdownOpen && (
+                        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 max-h-96 overflow-y-auto">
+                          {voices.map((voice) => (
+                            <button
+                              key={voice.voice_id}
+                              onClick={() => {
+                                setSelectedVoice(voice.voice_id);
+                                setIsVoiceDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center gap-4 px-6 py-4 text-left rounded-lg transition-all
+                                text-xl font-semibold
+                                border-2
+                                ${selectedVoice === voice.voice_id ? 'border-blue-600 bg-blue-50 font-bold text-blue-900 shadow-md' : 'border-transparent hover:border-blue-400 hover:bg-blue-50'}
+                              `}
+                              style={{ minHeight: '3.5rem' }}
+                            >
+                              <div className={`w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold ${selectedVoice === voice.voice_id ? 'text-blue-900' : 'text-gray-800'}`}>
+                                {voice.gender === 'Male' ? 'M' : 'F'}
+                              </div>
+                              <div>
+                                <div className={`${selectedVoice === voice.voice_id ? 'font-bold text-blue-900' : 'font-semibold text-gray-800'} text-lg`}>{voice.name} <span className="text-base text-gray-500">({voice.gender})</span></div>
+                                <div className="text-base text-gray-500">{voice.description}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <button
+                    onClick={handleSubmit}
                     className="ml-auto px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all flex items-center justify-center"
                     style={{ minWidth: 56, minHeight: 56 }}
                   >
